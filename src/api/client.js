@@ -1,4 +1,4 @@
-export const API_BASE_URL = 'https://bpm.dalasteppes.kz';
+import { getApiBaseUrl } from './serverUrl';
 
 export class ApiError extends Error {
   constructor(status, data) {
@@ -18,7 +18,8 @@ export function setUnauthorizedHandler(handler) {
 }
 
 export async function request(path, { method = 'GET', body, skipAuthRedirect = false } = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const baseUrl = getApiBaseUrl();
+  const response = await fetch(`${baseUrl}${path}`, {
     method,
     credentials: 'include',
     headers: {
@@ -26,8 +27,8 @@ export async function request(path, { method = 'GET', body, skipAuthRedirect = f
       // The web app's browser sends these automatically; our fetch doesn't.
       // At least one server view (comment/create) 500s on a byte-identical
       // body without them — likely reads Referer/Origin server-side unguarded.
-      Origin: API_BASE_URL,
-      Referer: `${API_BASE_URL}/`,
+      Origin: baseUrl,
+      Referer: `${baseUrl}/`,
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,

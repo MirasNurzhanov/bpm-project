@@ -1,6 +1,7 @@
 import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 import * as authApi from '../api/auth';
 import { setUnauthorizedHandler } from '../api/client';
+import { loadApiBaseUrl } from '../api/serverUrl';
 
 export const AuthContext = createContext(null);
 
@@ -21,7 +22,9 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    checkSession();
+    // Must load any saved server URL before the first request fires, or the
+    // boot session check would hit the hardcoded default instead.
+    loadApiBaseUrl().then(checkSession);
   }, [checkSession]);
 
   useEffect(() => {
@@ -44,6 +47,10 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
+    } catch {
+      // Best-effort: still clear local session state even if the network
+      // call itself fails outright (server unreachable, no connection —
+      // notably right after pointing Settings at a different server URL).
     } finally {
       setUser(null);
       setStatus('unauthenticated');

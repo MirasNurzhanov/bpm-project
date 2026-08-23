@@ -14,7 +14,11 @@ export default function SettingsRow({ icon, label, value, toggle, onToggle, onPr
         </TouchableOpacity>
       ) : (
         <>
-          {value !== undefined ? <Text style={styles.value}>{value}</Text> : null}
+          {value !== undefined ? (
+            <Text style={styles.value} numberOfLines={1}>
+              {value}
+            </Text>
+          ) : null}
           <Ionicons name="chevron-forward" size={16} color={colors.chevron} />
         </>
       )}
@@ -27,7 +31,7 @@ const styles = StyleSheet.create({
   border: { borderBottomWidth: 1, borderBottomColor: colors.line },
   icon: { marginRight: 6 },
   label: { flex: 1, fontFamily: fontFamily.regular, fontSize: 14, color: colors.text },
-  value: { fontFamily: fontFamily.regular, fontSize: 13, color: colors.muted },
+  value: { fontFamily: fontFamily.regular, fontSize: 13, color: colors.muted, maxWidth: 150 },
   toggle: {
     width: 38,
     height: 22,

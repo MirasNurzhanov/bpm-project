@@ -9,15 +9,18 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/hooks/useAuth';
 import { ApiError } from '../../src/api/client';
+import { getApiBaseUrl } from '../../src/api/serverUrl';
 import GradientHeader from '../../src/components/GradientHeader';
 import PrimaryButton from '../../src/components/PrimaryButton';
 import { colors, fontFamily } from '../../src/theme/theme';
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -120,6 +123,11 @@ export default function LoginScreen() {
             style={styles.submit}
           />
 
+          <TouchableOpacity style={styles.serverLink} onPress={() => router.push('/settings')}>
+            <Ionicons name="server-outline" size={13} color={colors.muted} />
+            <Text style={styles.serverLinkText} numberOfLines={1}>{getApiBaseUrl()}</Text>
+          </TouchableOpacity>
+
           <Text style={styles.footer}>© 2026 SevenDS</Text>
         </View>
       </ScrollView>
@@ -177,5 +185,13 @@ const styles = StyleSheet.create({
   forgot: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.primary },
   error: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.danger },
   submit: { marginTop: 4 },
+  serverLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+  },
+  serverLinkText: { fontFamily: fontFamily.regular, fontSize: 12, color: colors.muted },
   footer: { textAlign: 'center', fontFamily: fontFamily.regular, fontSize: 12, color: colors.muted3, marginTop: 8 },
 });

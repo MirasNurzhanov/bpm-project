@@ -11,6 +11,7 @@ import SettingsRow from '../../src/components/SettingsRow';
 import SecondaryButton from '../../src/components/SecondaryButton';
 import { colors, fontFamily } from '../../src/theme/theme';
 import { userDisplayName } from '../../src/utils/format';
+import { getApiBaseUrl } from '../../src/api/serverUrl';
 
 export default function ProfileScreen() {
   const { user, logout, refreshProfile } = useAuth();
@@ -43,7 +44,7 @@ export default function ProfileScreen() {
         title="Профиль"
         left={<View />}
         right={
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/settings')} hitSlop={8}>
             <Ionicons name="settings-outline" size={20} color={colors.surface} />
           </TouchableOpacity>
         }
@@ -78,6 +79,12 @@ export default function ProfileScreen() {
             label="Вход по Face ID"
             toggle={faceId}
             onToggle={() => setFaceId((v) => !v)}
+          />
+          <SettingsRow
+            icon="server-outline"
+            label="Сервер"
+            value={getApiBaseUrl()}
+            onPress={() => router.push('/settings')}
           />
           <SettingsRow icon="information-circle-outline" label="О приложении" value="1.0.0" last />
         </Card>
