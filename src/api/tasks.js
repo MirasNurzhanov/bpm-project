@@ -1,5 +1,6 @@
 import { request } from './client';
 import { unwrapList } from '../utils/unwrapList';
+import { escapeHtml } from '../utils/format';
 
 export async function getAssignedTasks() {
   return unwrapList(await request('/api/processes/simpletask/me/assigned/'));
@@ -15,13 +16,13 @@ export async function getTask(id) {
   return data?.object ?? data;
 }
 
-// Confirmed: task.status is {id, name}, ids 1-5. Sends the numeric target
-// status id. Field name ("status" vs "status_id") for this specific action
-// endpoint is still unverified — correct once tested.
+// Real task data has the raw FK field as "status_id" (not "status" — that's
+// the nested serialized {id,name} relation) — trying that exact field name
+// next, since {status: id} produced a bare, unhelpful 400.
 export function updateTaskStatus(id, statusId) {
   return request(`/api/processes/simpletask/${id}/update_status/`, {
     method: 'POST',
-    body: { status: statusId },
+    body: { status_id: statusId },
   });
 }
 
@@ -50,19 +51,24 @@ export function createTask({ title, description, project, assignee, position, de
   });
 }
 
-// Temporary discovery call — GET the blank comment form the same way we did
-// for create-task, to read its real field names instead of guessing further
-// (the POST guess crashed the server with a bare 500, no traceback exposed).
-export function getCommentCreateForm() {
-  return request('/api/bpm/comment/create/');
+// Confirmed via the web app's own Network tab: comments for a task are a
+// separate list endpoint, not embedded in the task detail response.
+export async function getComments(taskId) {
+  return unwrapList(await request(`/api/bpm/comment/simpletask/${taskId}/`));
 }
 
-// Task.comments is a ManyToManyField on the task model itself (per field_types
-// on a real task response), not a simple FK — the exact body field name this
-// generic /api/bpm/comment/create/ endpoint expects is still unverified.
+// Confirmed via the web app's own network request: comments use a generic
+// content_type/object_id pair (not a "task" FK), and text is HTML from a rich
+// text editor — plain text gets wrapped in <p> to match, with entities
+// escaped first since our composer is a plain TextInput, not a rich editor.
 export function createComment(taskId, text) {
   return request('/api/bpm/comment/create/', {
     method: 'POST',
-    body: { task: taskId, text },
+    body: {
+      content_type: 'simpletask',
+      object_id: taskId,
+      text: `<p>${escapeHtml(text)}</p>`,
+      attachments: [],
+    },
   });
 }

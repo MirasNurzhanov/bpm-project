@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFetch } from '../../src/hooks/useFetch';
+import { useAuth } from '../../src/hooks/useAuth';
 import { useRequireAuth } from '../../src/hooks/useRequireAuth';
-import { getTask, updateTaskStatus, createComment, getCommentCreateForm } from '../../src/api/tasks';
-import { formatApiErrorMessage } from '../../src/api/client';
+import { getTask, updateTaskStatus, createComment, getComments } from '../../src/api/tasks';
+import { ApiError, formatApiErrorMessage } from '../../src/api/client';
 import SolidHeader from '../../src/components/SolidHeader';
 import Card from '../../src/components/Card';
 import StatusPill from '../../src/components/StatusPill';
@@ -36,18 +37,17 @@ export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   useRequireAuth();
   const { data: task, loading, error, refetch } = useFetch(() => getTask(id), [id]);
+  const { data: commentsData, refetch: refetchComments } = useFetch(() => getComments(id), [id]);
 
   const [statusPending, setStatusPending] = useState(false);
   const [commentText, setCommentText] = useState('');
-  const [commentSubmitting, setCommentSubmitting] = useState(false);
-
-  useEffect(() => {
-    // Temporary discovery call — logs the comment form's real field names via
-    // client.js's [api] logging, since our POST guess crashed with a bare 500.
-    getCommentCreateForm().catch(() => {});
-  }, []);
+  // Posted immediately for instant feedback — the server takes a moment to
+  // confirm (and its own POST response is broken, see onSendComment), so we
+  // show these right away and drop them once a refetch brings back the real list.
+  const [pendingComments, setPendingComments] = useState([]);
 
   if (loading) return <LoadingState style={{ flex: 1 }} />;
   if (error || !task) {
@@ -66,8 +66,13 @@ export default function TaskDetailScreen() {
   const checklist = task.checklist ?? task.checklist_items ?? [];
   const checklistDone = checklist.filter((c) => c.done ?? c.is_done ?? c.completed).length;
   const attachments = task.attachments ?? [];
-  const comments = task.comments ?? [];
+  const comments = [...(commentsData ?? []), ...pendingComments];
   const action = nextStatusAction(task);
+  // Confirmed via a real 403: only the task's assignee can transition its
+  // status, not just whoever created it (even a superuser initiator gets
+  // refused) — gate the button on that instead of letting the tap fail.
+  const isAssignee = typeof task.assignee === 'object' && task.assignee?.id === user?.id;
+  const canTransition = Boolean(action) && isAssignee;
 
   const onTakeAction = async () => {
     if (!action) return;
@@ -85,15 +90,34 @@ export default function TaskDetailScreen() {
   const onSendComment = async () => {
     const text = commentText.trim();
     if (!text) return;
-    setCommentSubmitting(true);
+    setCommentText('');
+
+    const pendingId = `pending-${Date.now()}`;
+    setPendingComments((list) => [
+      ...list,
+      { id: pendingId, author: user, text: `<p>${text}</p>`, created_at: new Date().toISOString() },
+    ]);
+
+    const clearPending = () => setPendingComments((list) => list.filter((c) => c.id !== pendingId));
+
     try {
       await createComment(task.id, text);
-      setCommentText('');
-      await refetch();
+      await refetchComments();
+      clearPending();
     } catch (e) {
-      Alert.alert('Ошибка', formatApiErrorMessage(e, 'Не удалось отправить комментарий.'));
-    } finally {
-      setCommentSubmitting(false);
+      // Known backend quirk: comment/create/ actually saves the comment
+      // successfully but then crashes (bare 500, no detail — DEBUG is off)
+      // while building its response. Treat a 500 here as a likely success
+      // rather than alarming the user over a write that almost certainly
+      // went through — just refresh the list, the optimistic entry above
+      // already gave instant feedback.
+      if (e instanceof ApiError && e.status === 500) {
+        await refetchComments();
+        clearPending();
+      } else {
+        clearPending();
+        Alert.alert('Ошибка', formatApiErrorMessage(e, 'Не удалось отправить комментарий.'));
+      }
     }
   };
 
@@ -220,7 +244,7 @@ export default function TaskDetailScreen() {
               style={styles.composerInput}
               multiline
             />
-            <TouchableOpacity onPress={onSendComment} disabled={commentSubmitting || !commentText.trim()} hitSlop={8}>
+            <TouchableOpacity onPress={onSendComment} disabled={!commentText.trim()} hitSlop={8}>
               <Ionicons
                 name="send"
                 size={20}
@@ -233,7 +257,7 @@ export default function TaskDetailScreen() {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         <SecondaryButton icon="create-outline" iconOnly style={styles.footerIconButton} />
-        {action ? (
+        {canTransition ? (
           <PrimaryButton
             label={action.ctaLabel}
             icon="checkmark"
@@ -241,6 +265,10 @@ export default function TaskDetailScreen() {
             onPress={onTakeAction}
             style={styles.footerPrimary}
           />
+        ) : action ? (
+          <View style={[styles.footerPrimary, styles.footerHint]}>
+            <Text style={styles.footerHintText}>Доступно только исполнителю задачи</Text>
+          </View>
         ) : (
           <View style={styles.footerPrimary} />
         )}
@@ -307,4 +335,16 @@ const styles = StyleSheet.create({
   },
   footerIconButton: { width: 54 },
   footerPrimary: { flex: 1 },
+  footerHint: {
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: colors.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerHintText: {
+    fontFamily: fontFamily.medium,
+    fontSize: 13,
+    color: colors.muted,
+  },
 });

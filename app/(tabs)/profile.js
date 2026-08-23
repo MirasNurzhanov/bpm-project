@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/hooks/useAuth';
 import SolidHeader from '../../src/components/SolidHeader';
 import Avatar from '../../src/components/Avatar';
-import StatRow from '../../src/components/StatRow';
 import Card from '../../src/components/Card';
 import SettingsRow from '../../src/components/SettingsRow';
 import SecondaryButton from '../../src/components/SecondaryButton';
@@ -13,15 +13,24 @@ import { colors, fontFamily } from '../../src/theme/theme';
 import { userDisplayName } from '../../src/utils/format';
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshProfile } = useAuth();
   const router = useRouter();
   const [notifications, setNotifications] = useState(true);
   const [faceId, setFaceId] = useState(false);
 
+  // Profile was only ever fetched once at login/boot — refresh on every
+  // visit so stats stay current (and so we can actually see its [api] log).
+  useFocusEffect(
+    useCallback(() => {
+      refreshProfile();
+    }, [refreshProfile])
+  );
+
   const name = userDisplayName(user);
-  // User objects nest role/city under position.job/position.department
-  // (confirmed via a real project-members response) — same shape expected here.
-  const roleCity = [user?.position?.job?.name, user?.position?.department?.name].filter(Boolean).join(' · ');
+  // Confirmed via a real response: this endpoint gives direct position_name/
+  // department_name strings (unlike the nested position.job/position.department
+  // shape seen on user objects from other endpoints, e.g. project members).
+  const roleCity = [user?.position_name, user?.department_name].filter(Boolean).join(' · ');
 
   const onLogout = async () => {
     await logout();
@@ -45,14 +54,6 @@ export default function ProfileScreen() {
           {roleCity ? <Text style={styles.userMeta}>{roleCity}</Text> : null}
           {user?.email ? <Text style={styles.userMeta}>{user.email}</Text> : null}
         </View>
-
-        <StatRow
-          stats={[
-            { value: user?.active_tasks_count ?? '—', label: 'Активных' },
-            { value: user?.completed_tasks_count ?? '—', label: 'Завершено' },
-            { value: user?.on_time_rate != null ? `${user.on_time_rate}%` : '—', label: 'В срок' },
-          ]}
-        />
       </SolidHeader>
 
       <View style={styles.body}>

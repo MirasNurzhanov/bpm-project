@@ -23,6 +23,11 @@ export async function request(path, { method = 'GET', body, skipAuthRedirect = f
     credentials: 'include',
     headers: {
       Accept: 'application/json',
+      // The web app's browser sends these automatically; our fetch doesn't.
+      // At least one server view (comment/create) 500s on a byte-identical
+      // body without them — likely reads Referer/Origin server-side unguarded.
+      Origin: API_BASE_URL,
+      Referer: `${API_BASE_URL}/`,
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,

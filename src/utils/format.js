@@ -13,6 +13,16 @@ export function stripHtml(value) {
   return value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
 }
 
+// Inverse of stripHtml — used when sending plain text into a rich-text HTML
+// field (comment body) so a typed "<" or "&" doesn't break the markup.
+export function escapeHtml(value) {
+  if (!value) return '';
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function pad(n) {
   return String(n).padStart(2, '0');
 }
