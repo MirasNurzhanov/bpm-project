@@ -1,20 +1,14 @@
-// API user objects use first_name/last_name/username, not a single "name" field.
-// Also handles the "assignee": "" empty-string-when-unset shape seen on tasks.
 export function userDisplayName(user) {
   if (!user || typeof user !== 'object') return '';
   const full = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
   return full || user.username || '';
 }
 
-// task.description is a RichTextField and comes back as HTML (confirmed via a
-// real response, e.g. "<p>text</p>") — no rich renderer here, so strip tags.
 export function stripHtml(value) {
   if (!value) return '';
   return value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
 }
 
-// Inverse of stripHtml — used when sending plain text into a rich-text HTML
-// field (comment body) so a typed "<" or "&" doesn't break the markup.
 export function escapeHtml(value) {
   if (!value) return '';
   return value
@@ -72,7 +66,6 @@ export function formatRelative(value) {
   return formatDate(value);
 }
 
-// Parses "ДД.ММ.ГГГГ ЧЧ:ММ" (or just "ДД.ММ.ГГГГ") into an ISO string, or null if invalid.
 export function parseRuDateTime(value) {
   if (!value) return null;
   const match = value

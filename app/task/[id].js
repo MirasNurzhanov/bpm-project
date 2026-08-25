@@ -44,9 +44,6 @@ export default function TaskDetailScreen() {
 
   const [statusPending, setStatusPending] = useState(false);
   const [commentText, setCommentText] = useState('');
-  // Posted immediately for instant feedback — the server takes a moment to
-  // confirm (and its own POST response is broken, see onSendComment), so we
-  // show these right away and drop them once a refetch brings back the real list.
   const [pendingComments, setPendingComments] = useState([]);
 
   if (loading) return <LoadingState style={{ flex: 1 }} />;
@@ -68,9 +65,6 @@ export default function TaskDetailScreen() {
   const attachments = task.attachments ?? [];
   const comments = [...(commentsData ?? []), ...pendingComments];
   const action = nextStatusAction(task);
-  // Confirmed via a real 403: only the task's assignee can transition its
-  // status, not just whoever created it (even a superuser initiator gets
-  // refused) — gate the button on that instead of letting the tap fail.
   const isAssignee = typeof task.assignee === 'object' && task.assignee?.id === user?.id;
   const canTransition = Boolean(action) && isAssignee;
 
@@ -105,12 +99,6 @@ export default function TaskDetailScreen() {
       await refetchComments();
       clearPending();
     } catch (e) {
-      // Known backend quirk: comment/create/ actually saves the comment
-      // successfully but then crashes (bare 500, no detail — DEBUG is off)
-      // while building its response. Treat a 500 here as a likely success
-      // rather than alarming the user over a write that almost certainly
-      // went through — just refresh the list, the optimistic entry above
-      // already gave instant feedback.
       if (e instanceof ApiError && e.status === 500) {
         await refetchComments();
         clearPending();

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { View, ScrollView, RefreshControl, TouchableOpacity, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useFetch } from '../../src/hooks/useFetch';
@@ -24,6 +25,7 @@ const CLOSED_STATUSES = ['closed', 'completed'];
 
 export default function ProjectsScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
 
@@ -55,8 +57,8 @@ export default function ProjectsScreen() {
         left={<View />}
         right={
           <>
-            <TouchableOpacity>
-              <Ionicons name="notifications-outline" size={22} color={colors.surface} />
+            <TouchableOpacity onPress={() => router.push('/new-project')} hitSlop={8}>
+              <Ionicons name="add" size={24} color={colors.surface} />
             </TouchableOpacity>
             <Avatar name={userDisplayName(user)} size={34} color={colors.surface} />
           </>

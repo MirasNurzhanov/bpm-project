@@ -26,10 +26,6 @@ import SecondaryButton from '../src/components/SecondaryButton';
 import { colors, fontFamily } from '../src/theme/theme';
 import { parseRuDateTime } from '../src/utils/format';
 
-// Confirmed via a real 400 response: required fields are title, description,
-// project, priority (int 1-5, default 3 "Средний"), and either assignee or
-// position. Assignee/position are dropdowns of real users/roles, sourced live
-// from the create-form's own field metadata (this API embeds choices there).
 export default function NewTaskScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();

@@ -1,7 +1,3 @@
-// Confirmed via real API: task.status is a nested object {id, name, order_num, ...}
-// and the API already returns the Russian display name — we just map id -> tone/action.
-// Known statuses (from the task-list filter form choices):
-// 1 К выполнению, 2 В работе, 3 На проверке, 4 Завершена, 5 Отложено.
 const TONE_BY_STATUS_ID = {
   1: 'success',
   2: 'accent',
@@ -26,9 +22,6 @@ export function taskStatusInfo(task) {
   };
 }
 
-// The next status id + CTA label for the primary status-transition button.
-// Field name/shape for update_status's request body is still unverified —
-// currently guessing {status: <id>}; correct once tested against the real endpoint.
 const NEXT_STATUS_BY_ID = {
   1: { next: 2, ctaLabel: 'Взять в работу' },
   2: { next: 3, ctaLabel: 'Отправить на проверку' },

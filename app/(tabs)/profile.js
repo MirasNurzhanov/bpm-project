@@ -19,8 +19,6 @@ export default function ProfileScreen() {
   const [notifications, setNotifications] = useState(true);
   const [faceId, setFaceId] = useState(false);
 
-  // Profile was only ever fetched once at login/boot — refresh on every
-  // visit so stats stay current (and so we can actually see its [api] log).
   useFocusEffect(
     useCallback(() => {
       refreshProfile();
@@ -28,9 +26,6 @@ export default function ProfileScreen() {
   );
 
   const name = userDisplayName(user);
-  // Confirmed via a real response: this endpoint gives direct position_name/
-  // department_name strings (unlike the nested position.job/position.department
-  // shape seen on user objects from other endpoints, e.g. project members).
   const roleCity = [user?.position_name, user?.department_name].filter(Boolean).join(' · ');
 
   const onLogout = async () => {

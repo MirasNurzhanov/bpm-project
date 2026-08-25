@@ -1,5 +1,3 @@
-// BEST-GUESS mapping, kept for when/if a status field shows up on a project —
-// confirmed via a live response that /api/bpm/project/ currently returns none.
 const STATUS_MAP = {
   on_track: { label: 'В графике', tone: 'success' },
   in_progress: { label: 'В работе', tone: 'accent' },

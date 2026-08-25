@@ -10,9 +10,6 @@ export class ApiError extends Error {
 
 let unauthorizedHandler = null;
 
-// AuthContext registers itself here so any request in the app can trigger a
-// forced logout + redirect-to-login when the session cookie has expired,
-// not just the boot-time check.
 export function setUnauthorizedHandler(handler) {
   unauthorizedHandler = handler;
 }
@@ -24,9 +21,6 @@ export async function request(path, { method = 'GET', body, skipAuthRedirect = f
     credentials: 'include',
     headers: {
       Accept: 'application/json',
-      // The web app's browser sends these automatically; our fetch doesn't.
-      // At least one server view (comment/create) 500s on a byte-identical
-      // body without them — likely reads Referer/Origin server-side unguarded.
       Origin: baseUrl,
       Referer: `${baseUrl}/`,
       ...(body ? { 'Content-Type': 'application/json' } : {}),
@@ -38,10 +32,7 @@ export async function request(path, { method = 'GET', body, skipAuthRedirect = f
   const data = text ? safeParseJson(text) : null;
 
   if (__DEV__) {
-    // Temporary while we verify real API shapes — remove once field names are confirmed.
     if (data === null && text) {
-      // JSON parsing failed (likely an HTML error page / server traceback) —
-      // log the raw text so we can actually see what the server said.
       console.log(`[api] ${method} ${path} -> ${response.status} (unparseable body)`, text.slice(0, 3000));
     } else {
       console.log(`[api] ${method} ${path} -> ${response.status}`, JSON.stringify(data));
@@ -58,15 +49,25 @@ export async function request(path, { method = 'GET', body, skipAuthRedirect = f
   return data;
 }
 
-// DRF validation errors are usually {field: ["message", ...], ...} — flatten
-// them into something readable instead of a generic "request failed" string.
 export function formatApiErrorMessage(error, fallback = 'Не удалось выполнить запрос') {
   if (!(error instanceof ApiError) || !error.data || typeof error.data !== 'object') return fallback;
-  const parts = Object.entries(error.data).map(([field, value]) => {
-    const message = Array.isArray(value) ? value.join(', ') : String(value);
-    return field === 'detail' || field === 'non_field_errors' ? message : `${field}: ${message}`;
-  });
+  const errors = error.data.form?.errors ?? error.data.errors ?? error.data;
+  if (!errors || typeof errors !== 'object') return fallback;
+  const parts = Object.entries(errors)
+    .map(([field, value]) => {
+      const message = flattenErrorValue(value);
+      if (!message) return null;
+      return field === 'detail' || field === 'non_field_errors' || field === '__all__' ? message : `${field}: ${message}`;
+    })
+    .filter(Boolean);
   return parts.length ? parts.join('\n') : fallback;
+}
+
+function flattenErrorValue(value) {
+  if (Array.isArray(value)) return value.map(flattenErrorValue).filter(Boolean).join(', ');
+  if (value && typeof value === 'object') return Object.values(value).map(flattenErrorValue).filter(Boolean).join(', ');
+  if (value == null) return '';
+  return String(value);
 }
 
 function safeParseJson(text) {

@@ -2,7 +2,20 @@ import { Modal, View, Text, TouchableOpacity, FlatList, StyleSheet, Pressable } 
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radii, fontFamily } from '../theme/theme';
 
-export default function PickerModal({ visible, title, options, selectedId, onSelect, onClose }) {
+export default function PickerModal({
+  visible,
+  title,
+  options,
+  selectedId,
+  selectedIds,
+  onSelect,
+  onToggle,
+  onClose,
+  multiple = false,
+}) {
+  const isSelected = (id) => (multiple ? (selectedIds ?? []).includes(id) : id === selectedId);
+  const handlePress = (item) => (multiple ? onToggle(item) : onSelect(item));
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
@@ -13,17 +26,15 @@ export default function PickerModal({ visible, title, options, selectedId, onSel
             keyExtractor={(item) => String(item.id)}
             style={styles.list}
             renderItem={({ item }) => (
-              <TouchableOpacity style={styles.option} onPress={() => onSelect(item)}>
+              <TouchableOpacity style={styles.option} onPress={() => handlePress(item)}>
                 <Text style={styles.optionLabel}>{item.label}</Text>
-                {item.id === selectedId ? (
-                  <Ionicons name="checkmark" size={18} color={colors.primary} />
-                ) : null}
+                {isSelected(item.id) ? <Ionicons name="checkmark" size={18} color={colors.primary} /> : null}
               </TouchableOpacity>
             )}
             ListEmptyComponent={<Text style={styles.empty}>Нет доступных вариантов</Text>}
           />
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeLabel}>Закрыть</Text>
+            <Text style={styles.closeLabel}>{multiple ? 'Готово' : 'Закрыть'}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>

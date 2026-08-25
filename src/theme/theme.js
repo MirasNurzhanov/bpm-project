@@ -1,4 +1,3 @@
-// Ported 1:1 from the SevenDS Mobile design mockup's theme.css custom properties.
 export const colors = {
   primary: '#0e9cdb',
   primary700: '#0b86bd',
@@ -66,7 +65,6 @@ export const spacing = {
   huge: 32,
 };
 
-// Solid accent color per StatusPill tone — used for card left-borders etc.
 export const toneColors = {
   success: colors.success,
   danger: colors.danger,

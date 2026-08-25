@@ -37,11 +37,6 @@ export default function SettingsScreen() {
     setSaving(true);
     try {
       await setApiBaseUrl(url);
-      // The current session cookie belongs to the old server and is
-      // meaningless on a new one — force a fresh login rather than leaving
-      // the app in a half-authenticated state against the wrong backend.
-      // logout() itself swallows network failures (e.g. new URL unreachable),
-      // so it always resolves and this just always proceeds to the login screen.
       await logout();
       router.replace('/(auth)/login');
     } catch {
