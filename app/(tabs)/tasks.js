@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, RefreshControl, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useFetch } from '../../src/hooks/useFetch';
 import { getAssignedTasks, getCreatedTasks } from '../../src/api/tasks';
@@ -23,15 +23,28 @@ const SCOPES = [
 
 const FILTERS = [
   { key: 'all', label: 'Все' },
+  { key: 'todo', label: 'К выполнению' },
+  { key: 'inProgress', label: 'В работе' },
   { key: 'overdue', label: 'Просроченные' },
-  { key: 'favorite', label: 'Избранное' },
 ];
+
+const FILTER_KEYS = FILTERS.map((f) => f.key);
 
 export default function TasksScreen() {
   const { user } = useAuth();
+  const router = useRouter();
+  const params = useLocalSearchParams();
   const [scope, setScope] = useState('assigned');
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState(
+    FILTER_KEYS.includes(String(params.filter)) ? String(params.filter) : 'all'
+  );
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (params.filter && FILTER_KEYS.includes(String(params.filter))) {
+      setFilter(String(params.filter));
+    }
+  }, [params.filter, params.t]);
 
   const fetcher = scope === 'assigned' ? getAssignedTasks : getCreatedTasks;
   const { data, loading, refreshing, error, refetch, refresh } = useFetch(fetcher, [scope]);
@@ -47,7 +60,8 @@ export default function TasksScreen() {
   const filtered = useMemo(() => {
     let list = tasks;
     if (filter === 'overdue') list = list.filter(isOverdue);
-    if (filter === 'favorite') list = list.filter((t) => t.is_favs);
+    if (filter === 'todo') list = list.filter((t) => !isOverdue(t) && t.status?.id === 1);
+    if (filter === 'inProgress') list = list.filter((t) => !isOverdue(t) && t.status?.id === 2);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter((t) => (t.title ?? '').toLowerCase().includes(q));
@@ -64,20 +78,38 @@ export default function TasksScreen() {
         title="Мои задачи"
         left={<View />}
         right={
-          <>
-            <TouchableOpacity>
-              <Ionicons name="notifications-outline" size={22} color={colors.surface} />
-            </TouchableOpacity>
-            <Avatar name={userDisplayName(user)} size={34} color={colors.surface} />
-          </>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.8}>
+            <Avatar
+              name={userDisplayName(user)}
+              size={38}
+              color={colors.primary}
+              background={colors.surface}
+            />
+          </TouchableOpacity>
         }
       >
         <SearchBar value={search} onChangeText={setSearch} placeholder="Поиск по задачам" />
         <StatRow
           stats={[
-            { value: stats.todo, label: 'К выполнению' },
-            { value: stats.inProgress, label: 'В работе' },
-            { value: stats.overdue, label: 'Просрочено', color: stats.overdue ? colors.warning200 : undefined },
+            {
+              value: stats.todo,
+              label: 'К выполнению',
+              active: filter === 'todo',
+              onPress: () => setFilter((f) => (f === 'todo' ? 'all' : 'todo')),
+            },
+            {
+              value: stats.inProgress,
+              label: 'В работе',
+              active: filter === 'inProgress',
+              onPress: () => setFilter((f) => (f === 'inProgress' ? 'all' : 'inProgress')),
+            },
+            {
+              value: stats.overdue,
+              label: 'Просрочено',
+              color: stats.overdue ? colors.warning200 : undefined,
+              active: filter === 'overdue',
+              onPress: () => setFilter((f) => (f === 'overdue' ? 'all' : 'overdue')),
+            },
           ]}
         />
         <View style={styles.scopeRow}>
@@ -145,7 +177,7 @@ const styles = StyleSheet.create({
   scopeLabel: { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontFamily: fontFamily.medium },
   scopeLabelActive: { color: colors.surface },
   scopeUnderline: { height: 2, backgroundColor: colors.surface, borderRadius: 1, marginTop: 6 },
-  chipRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 16 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 16 },
   body: { paddingHorizontal: 16, paddingBottom: 24, gap: 8 },
   list: { gap: 12 },
   sectionSpacing: { marginTop: 20 },

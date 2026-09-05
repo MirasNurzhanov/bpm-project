@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { View, Text, ScrollView, RefreshControl, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useFetch } from '../../src/hooks/useFetch';
 import { getAssignedTasks } from '../../src/api/tasks';
@@ -15,7 +14,7 @@ import TaskCard from '../../src/components/TaskCard';
 import ProjectCard from '../../src/components/ProjectCard';
 import { LoadingState, ErrorState } from '../../src/components/AsyncState';
 import { colors, fontFamily } from '../../src/theme/theme';
-import { greeting, formatLongDate, formatDateTime, userDisplayName } from '../../src/utils/format';
+import { formatLongDate, formatDateTime, userDisplayName } from '../../src/utils/format';
 import { isOverdue } from '../../src/utils/taskStatus';
 
 export default function HomeScreen() {
@@ -46,6 +45,9 @@ export default function HomeScreen() {
 
   const displayName = userDisplayName(user);
 
+  const openTasks = (filter) =>
+    router.push({ pathname: '/(tabs)/tasks', params: { filter, t: String(Date.now()) } });
+
   const loading = tasksFetch.loading || projectsFetch.loading;
   const refreshing = tasksFetch.refreshing || projectsFetch.refreshing;
   const onRefresh = () => {
@@ -61,23 +63,37 @@ export default function HomeScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
     >
       <SolidHeader
-        title={`${greeting()}${displayName ? ', ' + displayName : ''}`}
-        subtitle={formatLongDate()}
+        title={formatLongDate()}
         left={<View />}
         right={
-          <>
-            <TouchableOpacity>
-              <Ionicons name="notifications-outline" size={22} color={colors.surface} />
-            </TouchableOpacity>
-            <Avatar name={displayName} size={34} color={colors.surface} />
-          </>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.8}>
+            <Avatar
+              name={displayName}
+              size={38}
+              color={colors.primary}
+              background={colors.surface}
+            />
+          </TouchableOpacity>
         }
       >
         <StatRow
           stats={[
-            { value: stats.todo, label: 'К выполнению' },
-            { value: stats.inProgress, label: 'В работе' },
-            { value: stats.overdue.length, label: 'Просрочено', color: stats.overdue.length ? colors.warning200 : undefined },
+            {
+              value: stats.todo,
+              label: 'К выполнению',
+              onPress: () => openTasks('todo'),
+            },
+            {
+              value: stats.inProgress,
+              label: 'В работе',
+              onPress: () => openTasks('inProgress'),
+            },
+            {
+              value: stats.overdue.length,
+              label: 'Просрочено',
+              color: stats.overdue.length ? colors.warning200 : undefined,
+              onPress: () => openTasks('overdue'),
+            },
           ]}
         />
       </SolidHeader>

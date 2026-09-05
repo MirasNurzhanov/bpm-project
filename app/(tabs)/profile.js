@@ -17,7 +17,6 @@ export default function ProfileScreen() {
   const { user, logout, refreshProfile } = useAuth();
   const router = useRouter();
   const [notifications, setNotifications] = useState(true);
-  const [faceId, setFaceId] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -45,7 +44,13 @@ export default function ProfileScreen() {
         }
       >
         <View style={styles.userRow}>
-          <Avatar name={name} size={62} color={colors.surface} style={styles.userAvatar} />
+          <Avatar
+            name={name}
+            size={62}
+            color={colors.primary}
+            background={colors.surface}
+            style={styles.userAvatar}
+          />
           <Text style={styles.userName}>{name}</Text>
           {roleCity ? <Text style={styles.userMeta}>{roleCity}</Text> : null}
           {user?.email ? <Text style={styles.userMeta}>{user.email}</Text> : null}
@@ -55,10 +60,17 @@ export default function ProfileScreen() {
       <View style={styles.body}>
         <Text style={styles.sectionLabel}>РАБОТА</Text>
         <Card style={styles.card}>
-          <SettingsRow icon="star-outline" label="Избранное" value={user?.favorites_count} />
-          <SettingsRow icon="calendar-outline" label="Планирование" />
-          <SettingsRow icon="trending-up-outline" label="Эффективность" />
-          <SettingsRow icon="pricetags-outline" label="Тэги и справочники" last />
+          <SettingsRow
+            icon="trending-up-outline"
+            label="Эффективность"
+            onPress={() => router.push('/efficiency')}
+          />
+          <SettingsRow
+            icon="pricetags-outline"
+            label="Тэги и справочники"
+            last
+            onPress={() => router.push('/tags')}
+          />
         </Card>
 
         <Text style={styles.sectionLabel}>ПРИЛОЖЕНИЕ</Text>
@@ -68,12 +80,6 @@ export default function ProfileScreen() {
             label="Уведомления"
             toggle={notifications}
             onToggle={() => setNotifications((v) => !v)}
-          />
-          <SettingsRow
-            icon="scan-outline"
-            label="Вход по Face ID"
-            toggle={faceId}
-            onToggle={() => setFaceId((v) => !v)}
           />
           <SettingsRow
             icon="server-outline"
@@ -101,7 +107,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.bg },
   userRow: { alignItems: 'center', gap: 4, marginTop: 4 },
-  userAvatar: { borderColor: 'rgba(255,255,255,0.5)', marginBottom: 8 },
+  userAvatar: { borderColor: colors.surface, marginBottom: 8 },
   userName: { fontFamily: fontFamily.semiBold, fontSize: 18, color: colors.surface },
   userMeta: { fontFamily: fontFamily.regular, fontSize: 13, color: colors.primary200 },
   body: { padding: 16, gap: 8 },

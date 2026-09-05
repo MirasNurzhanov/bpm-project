@@ -8,16 +8,16 @@ function initialsOf(name) {
   return letters.join('') || '?';
 }
 
-export default function Avatar({ name, size = 28, color = colors.primary, style }) {
+export default function Avatar({ name, size = 28, color = colors.primary, background = colors.primary50, style }) {
   return (
     <View
       style={[
         styles.circle,
-        { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.primary50, borderColor: color },
+        { width: size, height: size, borderRadius: size / 2, backgroundColor: background, borderColor: color },
         style,
       ]}
     >
-      <Text style={[styles.initials, { fontSize: size * 0.38, color }]}>{initialsOf(name)}</Text>
+      <Text style={[styles.initials, { fontSize: size * 0.4, color }]}>{initialsOf(name)}</Text>
     </View>
   );
 }

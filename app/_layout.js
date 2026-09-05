@@ -41,6 +41,8 @@ export default function RootLayout() {
             <Stack.Screen name="project/[id]" />
             <Stack.Screen name="new-project" options={{ presentation: 'modal' }} />
             <Stack.Screen name="settings" />
+            <Stack.Screen name="efficiency" />
+            <Stack.Screen name="tags" />
           </Stack>
         </AuthProvider>
       </SafeAreaProvider>

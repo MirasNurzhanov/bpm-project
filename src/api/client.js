@@ -16,6 +16,7 @@ export function setUnauthorizedHandler(handler) {
 
 export async function request(path, { method = 'GET', body, skipAuthRedirect = false } = {}) {
   const baseUrl = getApiBaseUrl();
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
   const response = await fetch(`${baseUrl}${path}`, {
     method,
     credentials: 'include',
@@ -23,9 +24,10 @@ export async function request(path, { method = 'GET', body, skipAuthRedirect = f
       Accept: 'application/json',
       Origin: baseUrl,
       Referer: `${baseUrl}/`,
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      // Let fetch set the multipart boundary itself for FormData bodies.
+      ...(body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
+    body: isFormData ? body : body ? JSON.stringify(body) : undefined,
   });
 
   const text = await response.text();

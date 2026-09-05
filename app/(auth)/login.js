@@ -39,9 +39,12 @@ export default function LoginScreen() {
     } catch (e) {
       if (e instanceof ApiError && (e.status === 400 || e.status === 401)) {
         setError('Неверный логин или пароль');
+      } else if (e instanceof ApiError) {
+        setError(`Ошибка сервера (${e.status}). Проверьте адрес сервера.`);
       } else {
-        setError('Не удалось войти. Проверьте соединение и попробуйте снова.');
+        setError('Нет связи с сервером. Проверьте адрес сервера и соединение.');
       }
+      if (__DEV__) console.log('[login] failed', e?.status, e?.message, getApiBaseUrl());
     } finally {
       setLoading(false);
     }
@@ -107,9 +110,6 @@ export default function LoginScreen() {
               </View>
               <Text style={styles.rememberLabel}>Запомнить</Text>
             </TouchableOpacity>
-            <TouchableOpacity>
-              <Text style={styles.forgot}>Забыли пароль?</Text>
-            </TouchableOpacity>
           </View>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -123,9 +123,19 @@ export default function LoginScreen() {
             style={styles.submit}
           />
 
-          <TouchableOpacity style={styles.serverLink} onPress={() => router.push('/settings')}>
-            <Ionicons name="server-outline" size={13} color={colors.muted} />
-            <Text style={styles.serverLinkText} numberOfLines={1}>{getApiBaseUrl()}</Text>
+          <TouchableOpacity
+            style={styles.serverButton}
+            onPress={() => router.push('/settings')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.serverIcon}>
+              <Ionicons name="server-outline" size={18} color={colors.primary} />
+            </View>
+            <View style={styles.serverTextGroup}>
+              <Text style={styles.serverButtonLabel}>Сменить сервер</Text>
+              <Text style={styles.serverButtonUrl} numberOfLines={1}>{getApiBaseUrl()}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.chevron} />
           </TouchableOpacity>
 
           <Text style={styles.footer}>© 2026 SevenDS</Text>
@@ -182,16 +192,30 @@ const styles = StyleSheet.create({
   },
   thumbOn: { alignSelf: 'flex-end' },
   rememberLabel: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.text2 },
-  forgot: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.primary },
   error: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.danger },
   submit: { marginTop: 4 },
-  serverLink: {
+  serverButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    gap: 12,
     marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border2,
+    backgroundColor: colors.fill,
   },
-  serverLinkText: { fontFamily: fontFamily.regular, fontSize: 12, color: colors.muted },
+  serverIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: colors.primary50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  serverTextGroup: { flex: 1, gap: 2 },
+  serverButtonLabel: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.text },
+  serverButtonUrl: { fontFamily: fontFamily.regular, fontSize: 12, color: colors.muted },
   footer: { textAlign: 'center', fontFamily: fontFamily.regular, fontSize: 12, color: colors.muted3, marginTop: 8 },
 });

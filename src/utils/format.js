@@ -77,6 +77,20 @@ export function parseRuDateTime(value) {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+export function formatFileSize(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  if (n < 1024) return `${n} Б`;
+  const units = ['КБ', 'МБ', 'ГБ'];
+  let value = n / 1024;
+  let i = 0;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
+    i += 1;
+  }
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[i]}`;
+}
+
 export function greeting(date = new Date()) {
   const h = date.getHours();
   if (h < 6) return 'Доброй ночи';

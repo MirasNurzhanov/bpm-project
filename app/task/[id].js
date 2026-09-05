@@ -2,12 +2,14 @@ import { useState } from 'react';
 import {
   View,
   Text,
+  Image,
   ScrollView,
   TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Linking,
   StyleSheet,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -16,7 +18,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFetch } from '../../src/hooks/useFetch';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useRequireAuth } from '../../src/hooks/useRequireAuth';
-import { getTask, updateTaskStatus, createComment, getComments } from '../../src/api/tasks';
+import {
+  getTask,
+  getTaskAttachments,
+  updateTaskStatus,
+  createComment,
+  getComments,
+  toggleTaskFavorite,
+  getProjectUsers,
+} from '../../src/api/tasks';
+import { getTags } from '../../src/api/tags';
 import { ApiError, formatApiErrorMessage } from '../../src/api/client';
 import SolidHeader from '../../src/components/SolidHeader';
 import Card from '../../src/components/Card';
@@ -31,7 +42,36 @@ import { LoadingState, ErrorState } from '../../src/components/AsyncState';
 import { colors, fontFamily } from '../../src/theme/theme';
 import { taskStatusInfo, nextStatusAction } from '../../src/utils/taskStatus';
 import { taskPriorityLevel, priorityLabel } from '../../src/utils/priority';
-import { formatDateTime, formatRelative, userDisplayName, stripHtml } from '../../src/utils/format';
+import { formatDateTime, formatRelative, formatFileSize, userDisplayName, stripHtml } from '../../src/utils/format';
+
+function attachmentUrl(a) {
+  return (
+    a?.file?.url ??
+    (typeof a?.file === 'string' ? a.file : null) ??
+    a?.url ??
+    a?.file_url ??
+    a?.download_url ??
+    a?.link ??
+    a?.href ??
+    null
+  );
+}
+
+function attachmentName(a) {
+  return a?.file?.name ?? a?.name ?? a?.file_name ?? a?.title ?? 'Файл';
+}
+
+function attachmentThumb(a) {
+  return a?.thumbnail?.url ?? null;
+}
+
+// `assistants`/`spectators`/`tags` may come back as full objects or bare ids
+// depending on the serializer; resolve ids against a lookup map either way.
+function resolveLabel(item, byId, fallbackLabel) {
+  if (item && typeof item === 'object') return fallbackLabel(item);
+  const found = byId.get(item) ?? byId.get(Number(item));
+  return found ? fallbackLabel(found) : `#${item}`;
+}
 
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -41,10 +81,19 @@ export default function TaskDetailScreen() {
   useRequireAuth();
   const { data: task, loading, error, refetch } = useFetch(() => getTask(id), [id]);
   const { data: commentsData, refetch: refetchComments } = useFetch(() => getComments(id), [id]);
+  const { data: attachmentsData } = useFetch(() => getTaskAttachments(id), [id]);
+  const taskProjectId = task?.project_id ?? task?.project?.id ?? null;
+  const { data: projectUsersData } = useFetch(
+    () => (taskProjectId ? getProjectUsers(taskProjectId) : Promise.resolve([])),
+    [taskProjectId]
+  );
+  const { data: tagsData } = useFetch(getTags, []);
 
   const [statusPending, setStatusPending] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [pendingComments, setPendingComments] = useState([]);
+  const [favOverride, setFavOverride] = useState(null);
+  const [favPending, setFavPending] = useState(false);
 
   if (loading) return <LoadingState style={{ flex: 1 }} />;
   if (error || !task) {
@@ -55,6 +104,26 @@ export default function TaskDetailScreen() {
     );
   }
 
+  const usersById = new Map((projectUsersData ?? []).map((u) => [u.id, u]));
+  const tagsById = new Map((tagsData ?? []).map((t) => [t.id ?? t.pk, t]));
+  const assistantsList = (task.assistants ?? []).map((p) =>
+    resolveLabel(p, usersById, (o) => userDisplayName(o) || o.label || o.username || `#${o.id ?? o.pk}`)
+  );
+  const spectatorsList = (task.spectators ?? []).map((p) =>
+    resolveLabel(p, usersById, (o) => userDisplayName(o) || o.label || o.username || `#${o.id ?? o.pk}`)
+  );
+  const taskTags = (task.tags ?? []).map((t) => {
+    if (t && typeof t === 'object') return t;
+    return tagsById.get(t) ?? tagsById.get(Number(t)) ?? { id: t, title: `#${t}` };
+  });
+
+  if (__DEV__) {
+    console.log(
+      '[task] assistants/spectators/tags raw ->',
+      JSON.stringify({ assistants: task.assistants, spectators: task.spectators, tags: task.tags })
+    );
+  }
+
   const status = taskStatusInfo(task);
   const code = task.slug ?? `#${task.id}`;
   const projectName = task.project?.name ?? '';
@@ -62,11 +131,27 @@ export default function TaskDetailScreen() {
   const assigneeName = userDisplayName(task.assignee) || '—';
   const checklist = task.checklist ?? task.checklist_items ?? [];
   const checklistDone = checklist.filter((c) => c.done ?? c.is_done ?? c.completed).length;
-  const attachments = task.attachments ?? [];
+  const attachments = attachmentsData ?? [];
   const comments = [...(commentsData ?? []), ...pendingComments];
   const action = nextStatusAction(task);
   const isAssignee = typeof task.assignee === 'object' && task.assignee?.id === user?.id;
   const canTransition = Boolean(action) && isAssignee;
+  const isFav = favOverride === null ? Boolean(task.is_favs) : favOverride;
+
+  const onToggleFav = async () => {
+    if (favPending || !user?.id) return;
+    const next = !isFav;
+    setFavOverride(next);
+    setFavPending(true);
+    try {
+      await toggleTaskFavorite(task.id, user.id);
+    } catch (e) {
+      setFavOverride(!next);
+      Alert.alert('Ошибка', formatApiErrorMessage(e, 'Не удалось изменить избранное.'));
+    } finally {
+      setFavPending(false);
+    }
+  };
 
   const onTakeAction = async () => {
     if (!action) return;
@@ -78,6 +163,21 @@ export default function TaskDetailScreen() {
       Alert.alert('Ошибка', formatApiErrorMessage(e, 'Не удалось изменить статус задачи. Попробуйте ещё раз.'));
     } finally {
       setStatusPending(false);
+    }
+  };
+
+  const onOpenAttachment = async (a) => {
+    const url = attachmentUrl(a);
+    if (!url) {
+      Alert.alert('Файл недоступен', 'Для этого вложения не пришла ссылка на файл.');
+      return;
+    }
+    try {
+      const ok = await Linking.canOpenURL(url);
+      if (!ok) throw new Error('cannot open');
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Ошибка', 'Не удалось открыть файл.');
     }
   };
 
@@ -119,8 +219,12 @@ export default function TaskDetailScreen() {
         }
         right={
           <>
-            <TouchableOpacity hitSlop={8}>
-              <Ionicons name="star-outline" size={20} color={colors.surface} />
+            <TouchableOpacity hitSlop={8} onPress={onToggleFav} disabled={favPending}>
+              <Ionicons
+                name={isFav ? 'star' : 'star-outline'}
+                size={20}
+                color={isFav ? colors.warning200 : colors.surface}
+              />
             </TouchableOpacity>
             <TouchableOpacity hitSlop={8}>
               <Ionicons name="ellipsis-horizontal" size={20} color={colors.surface} />
@@ -153,6 +257,7 @@ export default function TaskDetailScreen() {
         <Card style={styles.card}>
           <InfoRow icon="person-outline" label="Автор" value={authorName} />
           <InfoRow icon="person-circle-outline" label="Исполнитель" value={assigneeName} />
+          <InfoRow icon="calendar-outline" label="Создано" value={formatDateTime(task.create_date)} />
           <View style={[styles.row, styles.priorityRow]}>
             <Ionicons name="flag-outline" size={16} color={colors.muted} style={{ marginRight: 10 }} />
             <Text style={styles.label}>Приоритет</Text>
@@ -161,7 +266,34 @@ export default function TaskDetailScreen() {
               <Text style={styles.value}>{task.priority ?? priorityLabel(taskPriorityLevel(task))}</Text>
             </View>
           </View>
+          {taskTags.length ? (
+            <View style={styles.tagsRow}>
+              {taskTags.map((t, i) => (
+                <View key={t.id ?? t.pk ?? i} style={[styles.tagChip, { borderColor: t.color || colors.border }]}>
+                  <View style={[styles.tagDot, { backgroundColor: t.color || colors.muted3 }]} />
+                  <Text style={styles.tagChipText}>{t.title ?? t.str ?? t.label}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </Card>
+
+        {assistantsList.length || spectatorsList.length ? (
+          <Card style={styles.card}>
+            <Text style={styles.cardTitle}>Соисполнители и наблюдатели</Text>
+            {assistantsList.length ? (
+              <InfoRow
+                icon="people-outline"
+                label="Соисполнители"
+                value={assistantsList.join(', ')}
+                last={!spectatorsList.length}
+              />
+            ) : null}
+            {spectatorsList.length ? (
+              <InfoRow icon="eye-outline" label="Наблюдатели" value={spectatorsList.join(', ')} last />
+            ) : null}
+          </Card>
+        ) : null}
 
         {checklist.length ? (
           <Card style={styles.card}>
@@ -193,18 +325,31 @@ export default function TaskDetailScreen() {
         {attachments.length ? (
           <Card style={styles.card}>
             <Text style={styles.cardTitle}>Вложения · {attachments.length}</Text>
-            {attachments.map((a, i) => (
-              <View key={a.id ?? i} style={styles.attachmentRow}>
-                <Ionicons name="document-attach-outline" size={18} color={colors.muted} />
-                <View style={styles.attachmentInfo}>
-                  <Text style={styles.attachmentName} numberOfLines={1}>{a.name ?? a.file_name}</Text>
-                  <Text style={styles.attachmentMeta}>
-                    {a.size ? `${a.size} · ` : ''}{formatDateTime(a.created_at ?? a.uploaded_at)}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.chevron} />
-              </View>
-            ))}
+            {attachments.map((a, i) => {
+              const meta = [formatFileSize(a.size), formatDateTime(a.created_at ?? a.uploaded_at)]
+                .filter(Boolean)
+                .join(' · ');
+              const thumb = attachmentThumb(a);
+              return (
+                <TouchableOpacity
+                  key={a.id ?? a.pk ?? i}
+                  style={styles.attachmentRow}
+                  onPress={() => onOpenAttachment(a)}
+                  activeOpacity={0.7}
+                >
+                  {thumb ? (
+                    <Image source={{ uri: thumb }} style={styles.attachmentThumb} />
+                  ) : (
+                    <Ionicons name="document-attach-outline" size={18} color={colors.muted} />
+                  )}
+                  <View style={styles.attachmentInfo}>
+                    <Text style={styles.attachmentName} numberOfLines={1}>{attachmentName(a)}</Text>
+                    {meta ? <Text style={styles.attachmentMeta}>{meta}</Text> : null}
+                  </View>
+                  <Ionicons name="download-outline" size={18} color={colors.muted} />
+                </TouchableOpacity>
+              );
+            })}
           </Card>
         ) : null}
 
@@ -280,6 +425,18 @@ const styles = StyleSheet.create({
   label: { fontFamily: fontFamily.regular, fontSize: 13, color: colors.muted, flex: 1 },
   value: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.text },
   priorityValue: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 12 },
+  tagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    height: 26,
+    borderRadius: 999,
+    borderWidth: 1.5,
+  },
+  tagDot: { width: 7, height: 7, borderRadius: 3.5 },
+  tagChipText: { fontFamily: fontFamily.medium, fontSize: 12, color: colors.text },
   checklistHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   checklistCount: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.muted },
   checklistProgress: { marginBottom: 4 },
@@ -287,6 +444,7 @@ const styles = StyleSheet.create({
   checklistText: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.text, flex: 1 },
   checklistTextDone: { textDecorationLine: 'line-through', color: colors.muted },
   attachmentRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  attachmentThumb: { width: 32, height: 32, borderRadius: 6, backgroundColor: colors.fill },
   attachmentInfo: { flex: 1 },
   attachmentName: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.text },
   attachmentMeta: { fontFamily: fontFamily.regular, fontSize: 12, color: colors.muted },
