@@ -91,6 +91,47 @@ export function createTask({
   });
 }
 
+export function getTaskUpdateForm(id) {
+  return request(`/api/processes/simpletask/${id}/update/`);
+}
+
+export function updateTask(id, {
+  title,
+  description,
+  project,
+  assignee,
+  position = null,
+  milestone = null,
+  deadline,
+  priority,
+  tags = [],
+  assistants = [],
+  spectators = [],
+  flag = false,
+  isRepeating = false,
+  cronExpression = '0 0 * * *',
+}) {
+  return request(`/api/processes/simpletask/${id}/update/`, {
+    method: 'POST',
+    body: {
+      title,
+      description,
+      project,
+      assignee,
+      position,
+      milestone,
+      deadline,
+      priority,
+      tags,
+      assistants,
+      spectators,
+      flag,
+      is_repeating: isRepeating,
+      cron_expression: cronExpression,
+    },
+  });
+}
+
 export async function getComments(taskId) {
   return unwrapList(await request(`/api/bpm/comment/simpletask/${taskId}/`));
 }

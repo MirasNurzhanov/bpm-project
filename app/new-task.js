@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Alert,
   StyleSheet,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFetch } from '../src/hooks/useFetch';
 import { useRequireAuth } from '../src/hooks/useRequireAuth';
 import { getProjects } from '../src/api/projects';
-import { createTask, getTaskCreateForm, getProjectUsers } from '../src/api/tasks';
+import { createTask, updateTask, getTask, getTaskCreateForm, getProjectUsers } from '../src/api/tasks';
 import { getTags } from '../src/api/tags';
 import { buildNewFiles } from '../src/api/attachments';
 import { formatApiErrorMessage } from '../src/api/client';
@@ -27,15 +27,24 @@ import PriorityBar from '../src/components/PriorityBar';
 import PickerModal from '../src/components/PickerModal';
 import PrimaryButton from '../src/components/PrimaryButton';
 import { colors, fontFamily } from '../src/theme/theme';
-import { formatFullDateTime, formatFileSize } from '../src/utils/format';
+import { formatFullDateTime, formatFileSize, stripHtml, userDisplayName } from '../src/utils/format';
+
+const toId = (v) => (v && typeof v === 'object' ? (v.id ?? v.pk) : v);
 
 export default function NewTaskScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   useRequireAuth();
+  const { id: editId } = useLocalSearchParams();
+  const isEdit = Boolean(editId);
+
   const { data: projects } = useFetch(getProjects, []);
   const { data: createForm } = useFetch(getTaskCreateForm, []);
   const { data: tagsData } = useFetch(getTags, []);
+  const { data: editTask } = useFetch(
+    () => (editId ? getTask(editId) : Promise.resolve(null)),
+    [editId]
+  );
   const availableTags = tagsData ?? [];
 
   const [title, setTitle] = useState('');
@@ -69,9 +78,41 @@ export default function NewTaskScreen() {
   );
   const projectUsers = projectUsersData ?? [];
 
+  // Pre-fill from the task being edited (once).
+  const prefilled = useRef(false);
   useEffect(() => {
-    setAssistants([]);
-    setSpectators([]);
+    if (!editTask || prefilled.current) return;
+    prefilled.current = true;
+    setTitle(editTask.title ?? '');
+    setDescription(stripHtml(editTask.description) || editTask.description || '');
+    if (editTask.project) {
+      setProject({ id: toId(editTask.project), label: editTask.project.name ?? editTask.project.title ?? '' });
+    }
+    if (editTask.assignee) {
+      setAssignee({ id: toId(editTask.assignee), label: userDisplayName(editTask.assignee) || '' });
+    }
+    if (editTask.deadline) {
+      const d = new Date(editTask.deadline);
+      if (!Number.isNaN(d.getTime())) setDeadline(d);
+    }
+    if (editTask.priority != null) {
+      const p = Number(editTask.priority);
+      if (Number.isFinite(p)) setPriority(p);
+    }
+    setSelectedTagId(toId((editTask.tags ?? [])[0]) ?? null);
+    setAssistants((editTask.assistants ?? []).map(toId).filter((v) => v != null));
+    setSpectators((editTask.spectators ?? []).map(toId).filter((v) => v != null));
+  }, [editTask]);
+
+  // Clear participants only when the user changes an already-set project.
+  const prevProjectId = useRef();
+  useEffect(() => {
+    const prev = prevProjectId.current;
+    prevProjectId.current = project?.id;
+    if (prev !== undefined && prev !== project?.id) {
+      setAssistants([]);
+      setSpectators([]);
+    }
   }, [project?.id]);
 
   const pickAttachments = async () => {
@@ -149,7 +190,7 @@ export default function NewTaskScreen() {
   const submitTask = async (newFiles) => {
     setSubmitting(true);
     try {
-      await createTask({
+      const common = {
         title: title.trim(),
         description: description.trim(),
         project: project.id,
@@ -159,11 +200,22 @@ export default function NewTaskScreen() {
         tags: selectedTagId ? [selectedTagId] : [],
         assistants,
         spectators,
-        newFiles,
-      });
+      };
+      if (isEdit) {
+        await updateTask(editId, {
+          ...common,
+          position: editTask?.position_id ?? null,
+          milestone: editTask?.milestone_id ?? null,
+          flag: Boolean(editTask?.flag),
+          isRepeating: Boolean(editTask?.is_repeating),
+          cronExpression: editTask?.cron_expression ?? '0 0 * * *',
+        });
+      } else {
+        await createTask({ ...common, newFiles });
+      }
       router.back();
     } catch (e) {
-      Alert.alert('Ошибка', formatApiErrorMessage(e, 'Не удалось создать задачу. Проверьте данные и попробуйте снова.'));
+      Alert.alert('Ошибка', formatApiErrorMessage(e, 'Не удалось сохранить задачу. Проверьте данные и попробуйте снова.'));
     } finally {
       setSubmitting(false);
     }
@@ -181,7 +233,7 @@ export default function NewTaskScreen() {
     }
     setFieldErrors({});
 
-    if (!attachments.length) {
+    if (isEdit || !attachments.length) {
       submitTask([]);
       return;
     }
@@ -211,8 +263,8 @@ export default function NewTaskScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.cancel}>Отмена</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Новая задача</Text>
-        <Text style={styles.draft}>Черновик</Text>
+        <Text style={styles.headerTitle}>{isEdit ? 'Редактирование' : 'Новая задача'}</Text>
+        <View style={{ width: 48 }} />
       </View>
 
       <ScrollView style={styles.flex} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
@@ -342,29 +394,31 @@ export default function NewTaskScreen() {
           </Card>
         ) : null}
 
-        <Card style={styles.card}>
-          <Text style={styles.cardTitle}>
-            Вложения{attachments.length ? ` · ${attachments.length}` : ''}
-          </Text>
-          {attachments.map((a) => (
-            <View key={a.key} style={styles.attachmentRow}>
-              <Ionicons name="document-outline" size={18} color={colors.muted} />
-              <View style={styles.attachmentInfo}>
-                <Text style={styles.attachmentName} numberOfLines={1}>{a.name}</Text>
-                {formatFileSize(a.size) ? (
-                  <Text style={styles.attachmentMeta}>{formatFileSize(a.size)}</Text>
-                ) : null}
+        {!isEdit ? (
+          <Card style={styles.card}>
+            <Text style={styles.cardTitle}>
+              Вложения{attachments.length ? ` · ${attachments.length}` : ''}
+            </Text>
+            {attachments.map((a) => (
+              <View key={a.key} style={styles.attachmentRow}>
+                <Ionicons name="document-outline" size={18} color={colors.muted} />
+                <View style={styles.attachmentInfo}>
+                  <Text style={styles.attachmentName} numberOfLines={1}>{a.name}</Text>
+                  {formatFileSize(a.size) ? (
+                    <Text style={styles.attachmentMeta}>{formatFileSize(a.size)}</Text>
+                  ) : null}
+                </View>
+                <TouchableOpacity onPress={() => removeAttachment(a.key)} hitSlop={8}>
+                  <Ionicons name="close-circle" size={20} color={colors.muted3} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => removeAttachment(a.key)} hitSlop={8}>
-                <Ionicons name="close-circle" size={20} color={colors.muted3} />
-              </TouchableOpacity>
-            </View>
-          ))}
-          <TouchableOpacity style={styles.dropzone} onPress={pickAttachments} activeOpacity={0.7}>
-            <Ionicons name="cloud-upload-outline" size={22} color={colors.muted2} />
-            <Text style={styles.dropzoneText}>Прикрепить файл</Text>
-          </TouchableOpacity>
-        </Card>
+            ))}
+            <TouchableOpacity style={styles.dropzone} onPress={pickAttachments} activeOpacity={0.7}>
+              <Ionicons name="cloud-upload-outline" size={22} color={colors.muted2} />
+              <Text style={styles.dropzoneText}>Прикрепить файл</Text>
+            </TouchableOpacity>
+          </Card>
+        ) : null}
       </ScrollView>
 
       {pickerMode ? (
@@ -378,7 +432,7 @@ export default function NewTaskScreen() {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         <PrimaryButton
-          label="Создать задачу"
+          label={isEdit ? 'Сохранить' : 'Создать задачу'}
           loading={submitting}
           onPress={onSubmit}
           style={styles.footerPrimary}
@@ -440,7 +494,6 @@ const styles = StyleSheet.create({
   },
   cancel: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.muted },
   headerTitle: { fontFamily: fontFamily.semiBold, fontSize: 16, color: colors.text },
-  draft: { fontFamily: fontFamily.medium, fontSize: 12, color: colors.success },
   body: { padding: 16, gap: 12, paddingBottom: 32 },
   card: { gap: 14 },
   cardTitle: { fontFamily: fontFamily.semiBold, fontSize: 15, color: colors.text },

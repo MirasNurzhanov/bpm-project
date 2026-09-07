@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   Linking,
   StyleSheet,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFetch } from '../../src/hooks/useFetch';
@@ -106,6 +106,18 @@ export default function TaskDetailScreen() {
   const [pendingComments, setPendingComments] = useState([]);
   const [favOverride, setFavOverride] = useState(null);
   const [favPending, setFavPending] = useState(false);
+
+  const didMount = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (didMount.current) {
+        refetch();
+        refetchComments();
+      } else {
+        didMount.current = true;
+      }
+    }, [refetch, refetchComments])
+  );
 
   if (loading) return <LoadingState style={{ flex: 1 }} />;
   if (error || !task) {
@@ -236,13 +248,23 @@ export default function TaskDetailScreen() {
           </TouchableOpacity>
         }
         right={
-          <TouchableOpacity hitSlop={8} onPress={onToggleFav} disabled={favPending}>
-            <Ionicons
-              name={isFav ? 'star' : 'star-outline'}
-              size={20}
-              color={isFav ? colors.warning200 : colors.surface}
-            />
-          </TouchableOpacity>
+          <>
+            {isInitiator ? (
+              <TouchableOpacity
+                hitSlop={8}
+                onPress={() => router.push({ pathname: '/new-task', params: { id: task.id } })}
+              >
+                <Ionicons name="create-outline" size={20} color={colors.surface} />
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity hitSlop={8} onPress={onToggleFav} disabled={favPending}>
+              <Ionicons
+                name={isFav ? 'star' : 'star-outline'}
+                size={20}
+                color={isFav ? colors.warning200 : colors.surface}
+              />
+            </TouchableOpacity>
+          </>
         }
       >
         <View style={styles.codeRow}>
