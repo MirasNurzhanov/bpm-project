@@ -10,6 +10,21 @@ export async function getCreatedTasks() {
   return unwrapList(await request('/api/processes/simpletask/me/created/'));
 }
 
+export async function getSpectatorTasks() {
+  return unwrapList(await request('/api/processes/simpletask/me/spectator/'));
+}
+
+export async function getSubordinateTasks() {
+  return unwrapList(await request('/api/processes/simpletask/me/subordinates/'));
+}
+
+// { statuses: { "<id>": {...} }, graph: [{ from_status_id, to_status_id, action_name,
+//   can_assignee_advance, can_initiator_advance }] }
+export async function getTaskStatusGraph() {
+  const data = await request('/api/processes/simpletask/statuses/');
+  return { statuses: data?.statuses ?? {}, graph: data?.statusGraph ?? [] };
+}
+
 export async function getTask(id) {
   const data = await request(`/api/processes/simpletask/${id}/`);
   return data?.object ?? data;

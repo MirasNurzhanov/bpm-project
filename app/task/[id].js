@@ -26,6 +26,7 @@ import {
   getComments,
   toggleTaskFavorite,
   getProjectUsers,
+  getTaskStatusGraph,
 } from '../../src/api/tasks';
 import { getTags } from '../../src/api/tags';
 import { ApiError, formatApiErrorMessage } from '../../src/api/client';
@@ -37,10 +38,11 @@ import Avatar from '../../src/components/Avatar';
 import InfoRow from '../../src/components/InfoRow';
 import ProgressBar from '../../src/components/ProgressBar';
 import PrimaryButton from '../../src/components/PrimaryButton';
+import SecondaryButton from '../../src/components/SecondaryButton';
 import RichText from '../../src/components/RichText';
 import { LoadingState, ErrorState } from '../../src/components/AsyncState';
 import { colors, fontFamily } from '../../src/theme/theme';
-import { taskStatusInfo, nextStatusAction } from '../../src/utils/taskStatus';
+import { taskStatusInfo } from '../../src/utils/taskStatus';
 import { taskPriorityLevel, priorityLabel } from '../../src/utils/priority';
 import {
   formatDateTime,
@@ -97,8 +99,9 @@ export default function TaskDetailScreen() {
     [taskProjectId]
   );
   const { data: tagsData } = useFetch(getTags, []);
+  const { data: statusGraph } = useFetch(getTaskStatusGraph, []);
 
-  const [statusPending, setStatusPending] = useState(false);
+  const [statusPending, setStatusPending] = useState(null);
   const [commentText, setCommentText] = useState('');
   const [pendingComments, setPendingComments] = useState([]);
   const [favOverride, setFavOverride] = useState(null);
@@ -142,10 +145,16 @@ export default function TaskDetailScreen() {
   const checklistDone = checklist.filter((c) => c.done ?? c.is_done ?? c.completed).length;
   const attachments = attachmentsData ?? [];
   const comments = [...(commentsData ?? []), ...pendingComments];
-  const action = nextStatusAction(task);
-  const isAssignee = typeof task.assignee === 'object' && task.assignee?.id === user?.id;
-  const canTransition = Boolean(action) && isAssignee;
   const isFav = favOverride === null ? Boolean(task.is_favs) : favOverride;
+
+  const currentStatusId = task.status?.id ?? task.status_id ?? null;
+  const myId = user?.id;
+  const isAssignee = (task.assignee?.id ?? task.assignee?.pk ?? task.assignee_id) === myId;
+  const isInitiator = (task.initiator?.id ?? task.initiator?.pk ?? task.initiator_id) === myId;
+  const statusTransitions = (statusGraph?.graph ?? []).filter((g) => g.from_status_id === currentStatusId);
+  const myTransitions = statusTransitions.filter(
+    (g) => (g.can_assignee_advance && isAssignee) || (g.can_initiator_advance && isInitiator)
+  );
 
   const onToggleFav = async () => {
     if (favPending || !user?.id) return;
@@ -162,16 +171,16 @@ export default function TaskDetailScreen() {
     }
   };
 
-  const onTakeAction = async () => {
-    if (!action) return;
-    setStatusPending(true);
+  const onChangeStatus = async (toStatusId) => {
+    if (statusPending != null) return;
+    setStatusPending(toStatusId);
     try {
-      await updateTaskStatus(task.id, action.next);
+      await updateTaskStatus(task.id, toStatusId);
       await refetch();
     } catch (e) {
       Alert.alert('Ошибка', formatApiErrorMessage(e, 'Не удалось изменить статус задачи. Попробуйте ещё раз.'));
     } finally {
-      setStatusPending(false);
+      setStatusPending(null);
     }
   };
 
@@ -400,21 +409,27 @@ export default function TaskDetailScreen() {
         </Card>
       </ScrollView>
 
-      {action ? (
+      {myTransitions.length ? (
         <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-          {canTransition ? (
-            <PrimaryButton
-              label={action.ctaLabel}
-              icon="checkmark"
-              loading={statusPending}
-              onPress={onTakeAction}
-              style={styles.footerPrimary}
-            />
-          ) : (
-            <View style={[styles.footerPrimary, styles.footerHint]}>
-              <Text style={styles.footerHintText}>Доступно только исполнителю задачи</Text>
-            </View>
-          )}
+          {myTransitions.map((g, i) => {
+            const Btn = i === 0 ? PrimaryButton : SecondaryButton;
+            return (
+              <Btn
+                key={g.id}
+                label={g.action_name}
+                loading={statusPending === g.to_status_id}
+                disabled={statusPending != null && statusPending !== g.to_status_id}
+                onPress={() => onChangeStatus(g.to_status_id)}
+                style={styles.footerBtn}
+              />
+            );
+          })}
+        </View>
+      ) : statusTransitions.length ? (
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+          <View style={styles.footerHint}>
+            <Text style={styles.footerHintText}>Смена статуса недоступна для вашей роли</Text>
+          </View>
         </View>
       ) : null}
     </KeyboardAvoidingView>
@@ -484,11 +499,12 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: 16,
     paddingTop: 12,
+    gap: 8,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.line,
   },
-  footerPrimary: { width: '100%' },
+  footerBtn: { width: '100%' },
   footerHint: {
     height: 56,
     borderRadius: 12,

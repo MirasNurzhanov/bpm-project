@@ -3,7 +3,12 @@ import { View, Text, ScrollView, RefreshControl, TouchableOpacity, StyleSheet } 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useFetch } from '../../src/hooks/useFetch';
-import { getAssignedTasks, getCreatedTasks } from '../../src/api/tasks';
+import {
+  getAssignedTasks,
+  getCreatedTasks,
+  getSpectatorTasks,
+  getSubordinateTasks,
+} from '../../src/api/tasks';
 import SolidHeader from '../../src/components/SolidHeader';
 import SearchBar from '../../src/components/SearchBar';
 import StatRow from '../../src/components/StatRow';
@@ -17,8 +22,10 @@ import { isOverdue } from '../../src/utils/taskStatus';
 import { userDisplayName } from '../../src/utils/format';
 
 const SCOPES = [
-  { key: 'assigned', label: 'Мне назначены' },
-  { key: 'created', label: 'Я создал' },
+  { key: 'assigned', label: 'Мне назначены', fetcher: getAssignedTasks },
+  { key: 'created', label: 'Я создал', fetcher: getCreatedTasks },
+  { key: 'spectator', label: 'Наблюдаю', fetcher: getSpectatorTasks },
+  { key: 'subordinates', label: 'Подчинённых', fetcher: getSubordinateTasks },
 ];
 
 const FILTERS = [
@@ -46,7 +53,7 @@ export default function TasksScreen() {
     }
   }, [params.filter, params.t]);
 
-  const fetcher = scope === 'assigned' ? getAssignedTasks : getCreatedTasks;
+  const fetcher = (SCOPES.find((s) => s.key === scope) ?? SCOPES[0]).fetcher;
   const { data, loading, refreshing, error, refetch, refresh } = useFetch(fetcher, [scope]);
   const tasks = data ?? [];
 
@@ -113,14 +120,18 @@ export default function TasksScreen() {
             },
           ]}
         />
-        <View style={styles.scopeRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scopeRow}
+        >
           {SCOPES.map((s) => (
             <TouchableOpacity key={s.key} onPress={() => setScope(s.key)} style={styles.scopeTab}>
               <Text style={[styles.scopeLabel, scope === s.key && styles.scopeLabelActive]}>{s.label}</Text>
               {scope === s.key ? <View style={styles.scopeUnderline} /> : null}
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       </SolidHeader>
 
       <ScrollView
@@ -173,7 +184,7 @@ export default function TasksScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.bg },
-  scopeRow: { flexDirection: 'row', gap: 20, marginTop: 4 },
+  scopeRow: { flexDirection: 'row', gap: 20, marginTop: 4, paddingRight: 8 },
   scopeTab: { paddingBottom: 6 },
   scopeLabel: { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontFamily: fontFamily.medium },
   scopeLabelActive: { color: colors.surface },
