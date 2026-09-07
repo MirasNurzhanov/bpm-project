@@ -77,6 +77,13 @@ export function parseRuDateTime(value) {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+export function formatFullDateTime(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function formatFileSize(bytes) {
   const n = Number(bytes);
   if (!Number.isFinite(n) || n <= 0) return '';

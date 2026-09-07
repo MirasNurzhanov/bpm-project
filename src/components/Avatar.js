@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { colors, fontFamily } from '../theme/theme';
 
 function initialsOf(name) {
@@ -8,7 +9,17 @@ function initialsOf(name) {
   return letters.join('') || '?';
 }
 
-export default function Avatar({ name, size = 28, color = colors.primary, background = colors.primary50, style }) {
+export default function Avatar({
+  name,
+  uri,
+  size = 28,
+  color = colors.primary,
+  background = colors.primary50,
+  style,
+}) {
+  const [failed, setFailed] = useState(false);
+  const showImage = Boolean(uri) && !failed;
+
   return (
     <View
       style={[
@@ -17,7 +28,15 @@ export default function Avatar({ name, size = 28, color = colors.primary, backgr
         style,
       ]}
     >
-      <Text style={[styles.initials, { fontSize: size * 0.4, color }]}>{initialsOf(name)}</Text>
+      {showImage ? (
+        <Image
+          source={{ uri }}
+          onError={() => setFailed(true)}
+          style={{ width: size, height: size, borderRadius: size / 2 }}
+        />
+      ) : (
+        <Text style={[styles.initials, { fontSize: size * 0.4, color }]}>{initialsOf(name)}</Text>
+      )}
     </View>
   );
 }
@@ -27,6 +46,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
+    overflow: 'hidden',
   },
   initials: {
     fontFamily: fontFamily.semiBold,

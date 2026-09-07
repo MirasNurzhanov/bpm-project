@@ -46,6 +46,7 @@ export default function ProfileScreen() {
         <View style={styles.userRow}>
           <Avatar
             name={name}
+            uri={user?.photo?.url}
             size={62}
             color={colors.primary}
             background={colors.surface}

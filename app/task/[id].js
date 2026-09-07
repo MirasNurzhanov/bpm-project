@@ -37,12 +37,21 @@ import Avatar from '../../src/components/Avatar';
 import InfoRow from '../../src/components/InfoRow';
 import ProgressBar from '../../src/components/ProgressBar';
 import PrimaryButton from '../../src/components/PrimaryButton';
-import SecondaryButton from '../../src/components/SecondaryButton';
+import RichText from '../../src/components/RichText';
 import { LoadingState, ErrorState } from '../../src/components/AsyncState';
 import { colors, fontFamily } from '../../src/theme/theme';
 import { taskStatusInfo, nextStatusAction } from '../../src/utils/taskStatus';
 import { taskPriorityLevel, priorityLabel } from '../../src/utils/priority';
-import { formatDateTime, formatRelative, formatFileSize, userDisplayName, stripHtml } from '../../src/utils/format';
+import {
+  formatDateTime,
+  formatFullDateTime,
+  formatRelative,
+  formatFileSize,
+  userDisplayName,
+} from '../../src/utils/format';
+
+const commentAuthor = (c) => c?.user ?? c?.author ?? null;
+const commentDate = (c) => c?.create_date ?? c?.created_at ?? c?.date ?? null;
 
 function attachmentUrl(a) {
   return (
@@ -189,7 +198,7 @@ export default function TaskDetailScreen() {
     const pendingId = `pending-${Date.now()}`;
     setPendingComments((list) => [
       ...list,
-      { id: pendingId, author: user, text: `<p>${text}</p>`, created_at: new Date().toISOString() },
+      { id: pendingId, user, text: `<p>${text}</p>`, create_date: new Date().toISOString() },
     ]);
 
     const clearPending = () => setPendingComments((list) => list.filter((c) => c.id !== pendingId));
@@ -218,18 +227,13 @@ export default function TaskDetailScreen() {
           </TouchableOpacity>
         }
         right={
-          <>
-            <TouchableOpacity hitSlop={8} onPress={onToggleFav} disabled={favPending}>
-              <Ionicons
-                name={isFav ? 'star' : 'star-outline'}
-                size={20}
-                color={isFav ? colors.warning200 : colors.surface}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity hitSlop={8}>
-              <Ionicons name="ellipsis-horizontal" size={20} color={colors.surface} />
-            </TouchableOpacity>
-          </>
+          <TouchableOpacity hitSlop={8} onPress={onToggleFav} disabled={favPending}>
+            <Ionicons
+              name={isFav ? 'star' : 'star-outline'}
+              size={20}
+              color={isFav ? colors.warning200 : colors.surface}
+            />
+          </TouchableOpacity>
         }
       >
         <View style={styles.codeRow}>
@@ -250,7 +254,7 @@ export default function TaskDetailScreen() {
         {task.description ? (
           <Card style={styles.card}>
             <Text style={styles.cardTitle}>Описание</Text>
-            <Text style={styles.description}>{stripHtml(task.description)}</Text>
+            <RichText html={task.description} />
           </Card>
         ) : null}
 
@@ -258,6 +262,11 @@ export default function TaskDetailScreen() {
           <InfoRow icon="person-outline" label="Автор" value={authorName} />
           <InfoRow icon="person-circle-outline" label="Исполнитель" value={assigneeName} />
           <InfoRow icon="calendar-outline" label="Создано" value={formatDateTime(task.create_date)} />
+          <InfoRow
+            icon="time-outline"
+            label="Срок исполнения"
+            value={task.deadline ? formatFullDateTime(task.deadline) : 'Не задан'}
+          />
           <View style={[styles.row, styles.priorityRow]}>
             <Ionicons name="flag-outline" size={16} color={colors.muted} style={{ marginRight: 10 }} />
             <Text style={styles.label}>Приоритет</Text>
@@ -355,18 +364,21 @@ export default function TaskDetailScreen() {
 
         <Card style={styles.card}>
           <Text style={styles.cardTitle}>Комментарии · {comments.length}</Text>
-          {comments.map((c, i) => (
-            <View key={c.id ?? i} style={styles.commentRow}>
-              <Avatar name={userDisplayName(c.author)} size={28} />
-              <View style={styles.commentBody}>
-                <View style={styles.commentHeaderRow}>
-                  <Text style={styles.commentAuthor}>{userDisplayName(c.author)}</Text>
-                  <Text style={styles.commentTime}>{formatRelative(c.created_at ?? c.create_date)}</Text>
+          {comments.map((c, i) => {
+            const author = commentAuthor(c);
+            return (
+              <View key={c.id ?? i} style={styles.commentRow}>
+                <Avatar name={userDisplayName(author)} uri={author?.photo?.url} size={28} />
+                <View style={styles.commentBody}>
+                  <View style={styles.commentHeaderRow}>
+                    <Text style={styles.commentAuthor}>{userDisplayName(author) || 'Пользователь'}</Text>
+                    <Text style={styles.commentTime}>{formatRelative(commentDate(c))}</Text>
+                  </View>
+                  <RichText html={c.text ?? c.body} style={styles.commentText} />
                 </View>
-                <Text style={styles.commentText}>{stripHtml(c.text ?? c.body)}</Text>
               </View>
-            </View>
-          ))}
+            );
+          })}
 
           <View style={styles.composerRow}>
             <TextInput
@@ -388,24 +400,23 @@ export default function TaskDetailScreen() {
         </Card>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-        <SecondaryButton icon="create-outline" iconOnly style={styles.footerIconButton} />
-        {canTransition ? (
-          <PrimaryButton
-            label={action.ctaLabel}
-            icon="checkmark"
-            loading={statusPending}
-            onPress={onTakeAction}
-            style={styles.footerPrimary}
-          />
-        ) : action ? (
-          <View style={[styles.footerPrimary, styles.footerHint]}>
-            <Text style={styles.footerHintText}>Доступно только исполнителю задачи</Text>
-          </View>
-        ) : (
-          <View style={styles.footerPrimary} />
-        )}
-      </View>
+      {action ? (
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+          {canTransition ? (
+            <PrimaryButton
+              label={action.ctaLabel}
+              icon="checkmark"
+              loading={statusPending}
+              onPress={onTakeAction}
+              style={styles.footerPrimary}
+            />
+          ) : (
+            <View style={[styles.footerPrimary, styles.footerHint]}>
+              <Text style={styles.footerHintText}>Доступно только исполнителю задачи</Text>
+            </View>
+          )}
+        </View>
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -471,16 +482,13 @@ const styles = StyleSheet.create({
     maxHeight: 80,
   },
   footer: {
-    flexDirection: 'row',
-    gap: 10,
     paddingHorizontal: 16,
     paddingTop: 12,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.line,
   },
-  footerIconButton: { width: 54 },
-  footerPrimary: { flex: 1 },
+  footerPrimary: { width: '100%' },
   footerHint: {
     height: 56,
     borderRadius: 12,

@@ -6,8 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
-  Modal,
-  Pressable,
   Platform,
   Alert,
   StyleSheet,
@@ -15,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFetch } from '../src/hooks/useFetch';
 import { useRequireAuth } from '../src/hooks/useRequireAuth';
@@ -27,9 +26,8 @@ import Card from '../src/components/Card';
 import PriorityBar from '../src/components/PriorityBar';
 import PickerModal from '../src/components/PickerModal';
 import PrimaryButton from '../src/components/PrimaryButton';
-import SecondaryButton from '../src/components/SecondaryButton';
 import { colors, fontFamily } from '../src/theme/theme';
-import { parseRuDateTime, formatFileSize } from '../src/utils/format';
+import { formatFullDateTime, formatFileSize } from '../src/utils/format';
 
 export default function NewTaskScreen() {
   const router = useRouter();
@@ -44,7 +42,9 @@ export default function NewTaskScreen() {
   const [description, setDescription] = useState('');
   const [project, setProject] = useState(null);
   const [assignee, setAssignee] = useState(null);
-  const [dueDateText, setDueDateText] = useState('');
+  const [deadline, setDeadline] = useState(null);
+  const [pickerMode, setPickerMode] = useState(null); // 'date' | 'time' | null
+  const [pickerTemp, setPickerTemp] = useState(null);
   const [priority, setPriority] = useState(3);
   const [attachments, setAttachments] = useState([]);
   const [selectedTagId, setSelectedTagId] = useState(null);
@@ -52,7 +52,8 @@ export default function NewTaskScreen() {
   const [spectators, setSpectators] = useState([]);
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [assigneePickerOpen, setAssigneePickerOpen] = useState(false);
-  const [watchersOpen, setWatchersOpen] = useState(false);
+  const [assistantPickerOpen, setAssistantPickerOpen] = useState(false);
+  const [spectatorPickerOpen, setSpectatorPickerOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
 
@@ -112,12 +113,33 @@ export default function NewTaskScreen() {
     setSpectators((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   };
 
-  const onOpenWatchers = () => {
+  const openPeoplePicker = (setter) => {
     if (!project) {
-      Alert.alert('Выберите проект', 'Сначала выберите проект, чтобы добавить соисполнителей и наблюдателей.');
+      Alert.alert('Выберите проект', 'Сначала выберите проект, чтобы выбрать участников.');
       return;
     }
-    setWatchersOpen(true);
+    setter(true);
+  };
+
+  const openDeadlinePicker = () => {
+    setPickerTemp(deadline ?? new Date());
+    setPickerMode('date');
+  };
+
+  const onDeadlineChange = (event, selected) => {
+    if (event.type === 'dismissed' || !selected) {
+      setPickerMode(null);
+      return;
+    }
+    if (pickerMode === 'date') {
+      setPickerTemp(selected);
+      setPickerMode('time');
+    } else {
+      const final = new Date(pickerTemp ?? selected);
+      final.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+      setDeadline(final);
+      setPickerMode(null);
+    }
   };
 
   const clearFieldError = (field) => {
@@ -132,7 +154,7 @@ export default function NewTaskScreen() {
         description: description.trim(),
         project: project.id,
         assignee: assignee.id,
-        deadline: parseRuDateTime(dueDateText) ?? undefined,
+        deadline: deadline ? deadline.toISOString() : undefined,
         priority,
         tags: selectedTagId ? [selectedTagId] : [],
         assistants,
@@ -245,28 +267,44 @@ export default function NewTaskScreen() {
             <Ionicons name="chevron-forward" size={16} color={colors.chevron} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.pickerRow, styles.border]} onPress={onOpenWatchers}>
+          <TouchableOpacity
+            style={[styles.pickerRow, styles.border]}
+            onPress={() => openPeoplePicker(setAssistantPickerOpen)}
+          >
             <Ionicons name="people-outline" size={18} color={colors.muted} />
-            <Text style={styles.pickerLabel}>Соисполнители и наблюдатели</Text>
+            <Text style={styles.pickerLabel}>Соисполнители</Text>
             <Text style={styles.pickerValue} numberOfLines={1}>
-              {assistants.length || spectators.length
-                ? `${assistants.length} · ${spectators.length}`
-                : 'Не выбраны'}
+              {assistants.length ? `Выбрано: ${assistants.length}` : 'Не выбраны'}
             </Text>
             <Ionicons name="chevron-forward" size={16} color={colors.chevron} />
           </TouchableOpacity>
 
-          <View style={styles.pickerRow}>
+          <TouchableOpacity
+            style={[styles.pickerRow, styles.border]}
+            onPress={() => openPeoplePicker(setSpectatorPickerOpen)}
+          >
+            <Ionicons name="eye-outline" size={18} color={colors.muted} />
+            <Text style={styles.pickerLabel}>Наблюдатели</Text>
+            <Text style={styles.pickerValue} numberOfLines={1}>
+              {spectators.length ? `Выбрано: ${spectators.length}` : 'Не выбраны'}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.chevron} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.pickerRow} onPress={openDeadlinePicker}>
             <Ionicons name="calendar-outline" size={18} color={colors.muted} />
             <Text style={styles.pickerLabel}>Срок исполнения</Text>
-            <TextInput
-              value={dueDateText}
-              onChangeText={setDueDateText}
-              placeholder="ДД.ММ.ГГГГ ЧЧ:ММ"
-              placeholderTextColor={colors.muted3}
-              style={styles.pickerInput}
-            />
-          </View>
+            <Text style={styles.pickerValue} numberOfLines={1}>
+              {deadline ? formatFullDateTime(deadline) : 'Не задан'}
+            </Text>
+            {deadline ? (
+              <TouchableOpacity onPress={() => setDeadline(null)} hitSlop={8}>
+                <Ionicons name="close-circle" size={16} color={colors.muted3} />
+              </TouchableOpacity>
+            ) : (
+              <Ionicons name="chevron-forward" size={16} color={colors.chevron} />
+            )}
+          </TouchableOpacity>
         </Card>
 
         <Card style={styles.card}>
@@ -327,16 +365,18 @@ export default function NewTaskScreen() {
             <Text style={styles.dropzoneText}>Прикрепить файл</Text>
           </TouchableOpacity>
         </Card>
-
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-        <SecondaryButton
-          icon="attach-outline"
-          iconOnly
-          style={styles.footerIconButton}
-          onPress={pickAttachments}
+      {pickerMode ? (
+        <DateTimePicker
+          value={pickerTemp ?? new Date()}
+          mode={pickerMode}
+          is24Hour
+          onChange={onDeadlineChange}
         />
+      ) : null}
+
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         <PrimaryButton
           label="Создать задачу"
           loading={submitting}
@@ -363,54 +403,25 @@ export default function NewTaskScreen() {
         onClose={() => setAssigneePickerOpen(false)}
       />
 
-      <Modal
-        visible={watchersOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setWatchersOpen(false)}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={() => setWatchersOpen(false)}>
-          <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>Соисполнители и наблюдатели</Text>
-            <ScrollView style={styles.modalList}>
-              <Text style={styles.modalSectionLabel}>СОИСПОЛНИТЕЛИ</Text>
-              {projectUsers.map((u) => (
-                <TouchableOpacity
-                  key={`a-${u.id}`}
-                  style={styles.modalRow}
-                  onPress={() => toggleAssistant(u.id)}
-                >
-                  <Text style={styles.modalRowLabel}>{u.label}</Text>
-                  {assistants.includes(u.id) ? (
-                    <Ionicons name="checkmark" size={18} color={colors.primary} />
-                  ) : null}
-                </TouchableOpacity>
-              ))}
+      <PickerModal
+        visible={assistantPickerOpen}
+        title="Соисполнители"
+        options={projectUsers}
+        multiple
+        selectedIds={assistants}
+        onToggle={(item) => toggleAssistant(item.id)}
+        onClose={() => setAssistantPickerOpen(false)}
+      />
 
-              <Text style={[styles.modalSectionLabel, styles.modalSectionSpacing]}>НАБЛЮДАТЕЛИ</Text>
-              {projectUsers.map((u) => (
-                <TouchableOpacity
-                  key={`s-${u.id}`}
-                  style={styles.modalRow}
-                  onPress={() => toggleSpectator(u.id)}
-                >
-                  <Text style={styles.modalRowLabel}>{u.label}</Text>
-                  {spectators.includes(u.id) ? (
-                    <Ionicons name="checkmark" size={18} color={colors.primary} />
-                  ) : null}
-                </TouchableOpacity>
-              ))}
-
-              {!projectUsers.length ? (
-                <Text style={styles.modalEmptyText}>В этом проекте нет доступных пользователей</Text>
-              ) : null}
-            </ScrollView>
-            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setWatchersOpen(false)}>
-              <Text style={styles.modalCloseLabel}>Готово</Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <PickerModal
+        visible={spectatorPickerOpen}
+        title="Наблюдатели"
+        options={projectUsers}
+        multiple
+        selectedIds={spectators}
+        onToggle={(item) => toggleSpectator(item.id)}
+        onClose={() => setSpectatorPickerOpen(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -439,17 +450,10 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 60, textAlignVertical: 'top' },
   error: { fontFamily: fontFamily.regular, fontSize: 12, color: colors.danger },
   pickerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
-  border: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.line },
+  border: { borderTopWidth: 1, borderColor: colors.line },
   pickerLabel: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.text, flex: 1 },
-  pickerValue: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.muted, maxWidth: 140 },
+  pickerValue: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.muted, maxWidth: 150 },
   pickerValueError: { color: colors.danger },
-  pickerInput: {
-    fontFamily: fontFamily.medium,
-    fontSize: 13,
-    color: colors.text,
-    textAlign: 'right',
-    minWidth: 140,
-  },
   priorityBar: { marginTop: 4 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tagChip: {
@@ -480,51 +484,11 @@ const styles = StyleSheet.create({
   attachmentName: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.text },
   attachmentMeta: { fontFamily: fontFamily.regular, fontSize: 12, color: colors.muted },
   footer: {
-    flexDirection: 'row',
-    gap: 10,
     paddingHorizontal: 16,
     paddingTop: 12,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.line,
   },
-  footerIconButton: { width: 54 },
-  footerPrimary: { flex: 1 },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(22,25,29,0.4)', justifyContent: 'flex-end' },
-  modalSheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
-    padding: 20,
-    maxHeight: '75%',
-  },
-  modalTitle: { fontFamily: fontFamily.semiBold, fontSize: 16, color: colors.text, marginBottom: 8 },
-  modalList: { flexGrow: 0 },
-  modalSectionLabel: {
-    fontFamily: fontFamily.medium,
-    fontSize: 11,
-    letterSpacing: 0.6,
-    color: colors.muted,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  modalSectionSpacing: { marginTop: 16 },
-  modalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-  },
-  modalRowLabel: { fontFamily: fontFamily.regular, fontSize: 15, color: colors.text },
-  modalEmptyText: {
-    fontFamily: fontFamily.regular,
-    fontSize: 14,
-    color: colors.muted,
-    paddingVertical: 20,
-    textAlign: 'center',
-  },
-  modalCloseButton: { paddingVertical: 14, alignItems: 'center' },
-  modalCloseLabel: { fontFamily: fontFamily.medium, fontSize: 15, color: colors.primary },
+  footerPrimary: { width: '100%' },
 });
