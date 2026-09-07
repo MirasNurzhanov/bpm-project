@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   Linking,
   StyleSheet,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFetch } from '../../src/hooks/useFetch';
@@ -26,6 +26,7 @@ import {
   getComments,
   toggleTaskFavorite,
   getProjectUsers,
+  getTaskStatusGraph,
 } from '../../src/api/tasks';
 import { getTags } from '../../src/api/tags';
 import { ApiError, formatApiErrorMessage } from '../../src/api/client';
@@ -38,11 +39,21 @@ import InfoRow from '../../src/components/InfoRow';
 import ProgressBar from '../../src/components/ProgressBar';
 import PrimaryButton from '../../src/components/PrimaryButton';
 import SecondaryButton from '../../src/components/SecondaryButton';
+import RichText from '../../src/components/RichText';
 import { LoadingState, ErrorState } from '../../src/components/AsyncState';
 import { colors, fontFamily } from '../../src/theme/theme';
-import { taskStatusInfo, nextStatusAction } from '../../src/utils/taskStatus';
+import { taskStatusInfo } from '../../src/utils/taskStatus';
 import { taskPriorityLevel, priorityLabel } from '../../src/utils/priority';
-import { formatDateTime, formatRelative, formatFileSize, userDisplayName, stripHtml } from '../../src/utils/format';
+import {
+  formatDateTime,
+  formatFullDateTime,
+  formatRelative,
+  formatFileSize,
+  userDisplayName,
+} from '../../src/utils/format';
+
+const commentAuthor = (c) => c?.user ?? c?.author ?? null;
+const commentDate = (c) => c?.create_date ?? c?.created_at ?? c?.date ?? null;
 
 function attachmentUrl(a) {
   return (
@@ -88,12 +99,25 @@ export default function TaskDetailScreen() {
     [taskProjectId]
   );
   const { data: tagsData } = useFetch(getTags, []);
+  const { data: statusGraph } = useFetch(getTaskStatusGraph, []);
 
-  const [statusPending, setStatusPending] = useState(false);
+  const [statusPending, setStatusPending] = useState(null);
   const [commentText, setCommentText] = useState('');
   const [pendingComments, setPendingComments] = useState([]);
   const [favOverride, setFavOverride] = useState(null);
   const [favPending, setFavPending] = useState(false);
+
+  const didMount = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (didMount.current) {
+        refetch();
+        refetchComments();
+      } else {
+        didMount.current = true;
+      }
+    }, [refetch, refetchComments])
+  );
 
   if (loading) return <LoadingState style={{ flex: 1 }} />;
   if (error || !task) {
@@ -133,10 +157,16 @@ export default function TaskDetailScreen() {
   const checklistDone = checklist.filter((c) => c.done ?? c.is_done ?? c.completed).length;
   const attachments = attachmentsData ?? [];
   const comments = [...(commentsData ?? []), ...pendingComments];
-  const action = nextStatusAction(task);
-  const isAssignee = typeof task.assignee === 'object' && task.assignee?.id === user?.id;
-  const canTransition = Boolean(action) && isAssignee;
   const isFav = favOverride === null ? Boolean(task.is_favs) : favOverride;
+
+  const currentStatusId = task.status?.id ?? task.status_id ?? null;
+  const myId = user?.id;
+  const isAssignee = (task.assignee?.id ?? task.assignee?.pk ?? task.assignee_id) === myId;
+  const isInitiator = (task.initiator?.id ?? task.initiator?.pk ?? task.initiator_id) === myId;
+  const statusTransitions = (statusGraph?.graph ?? []).filter((g) => g.from_status_id === currentStatusId);
+  const myTransitions = statusTransitions.filter(
+    (g) => (g.can_assignee_advance && isAssignee) || (g.can_initiator_advance && isInitiator)
+  );
 
   const onToggleFav = async () => {
     if (favPending || !user?.id) return;
@@ -153,16 +183,16 @@ export default function TaskDetailScreen() {
     }
   };
 
-  const onTakeAction = async () => {
-    if (!action) return;
-    setStatusPending(true);
+  const onChangeStatus = async (toStatusId) => {
+    if (statusPending != null) return;
+    setStatusPending(toStatusId);
     try {
-      await updateTaskStatus(task.id, action.next);
+      await updateTaskStatus(task.id, toStatusId);
       await refetch();
     } catch (e) {
       Alert.alert('Ошибка', formatApiErrorMessage(e, 'Не удалось изменить статус задачи. Попробуйте ещё раз.'));
     } finally {
-      setStatusPending(false);
+      setStatusPending(null);
     }
   };
 
@@ -189,7 +219,7 @@ export default function TaskDetailScreen() {
     const pendingId = `pending-${Date.now()}`;
     setPendingComments((list) => [
       ...list,
-      { id: pendingId, author: user, text: `<p>${text}</p>`, created_at: new Date().toISOString() },
+      { id: pendingId, user, text: `<p>${text}</p>`, create_date: new Date().toISOString() },
     ]);
 
     const clearPending = () => setPendingComments((list) => list.filter((c) => c.id !== pendingId));
@@ -219,15 +249,20 @@ export default function TaskDetailScreen() {
         }
         right={
           <>
+            {isInitiator ? (
+              <TouchableOpacity
+                hitSlop={8}
+                onPress={() => router.push({ pathname: '/new-task', params: { id: task.id } })}
+              >
+                <Ionicons name="create-outline" size={20} color={colors.surface} />
+              </TouchableOpacity>
+            ) : null}
             <TouchableOpacity hitSlop={8} onPress={onToggleFav} disabled={favPending}>
               <Ionicons
                 name={isFav ? 'star' : 'star-outline'}
                 size={20}
                 color={isFav ? colors.warning200 : colors.surface}
               />
-            </TouchableOpacity>
-            <TouchableOpacity hitSlop={8}>
-              <Ionicons name="ellipsis-horizontal" size={20} color={colors.surface} />
             </TouchableOpacity>
           </>
         }
@@ -250,7 +285,7 @@ export default function TaskDetailScreen() {
         {task.description ? (
           <Card style={styles.card}>
             <Text style={styles.cardTitle}>Описание</Text>
-            <Text style={styles.description}>{stripHtml(task.description)}</Text>
+            <RichText html={task.description} />
           </Card>
         ) : null}
 
@@ -258,6 +293,11 @@ export default function TaskDetailScreen() {
           <InfoRow icon="person-outline" label="Автор" value={authorName} />
           <InfoRow icon="person-circle-outline" label="Исполнитель" value={assigneeName} />
           <InfoRow icon="calendar-outline" label="Создано" value={formatDateTime(task.create_date)} />
+          <InfoRow
+            icon="time-outline"
+            label="Срок исполнения"
+            value={task.deadline ? formatFullDateTime(task.deadline) : 'Не задан'}
+          />
           <View style={[styles.row, styles.priorityRow]}>
             <Ionicons name="flag-outline" size={16} color={colors.muted} style={{ marginRight: 10 }} />
             <Text style={styles.label}>Приоритет</Text>
@@ -355,18 +395,21 @@ export default function TaskDetailScreen() {
 
         <Card style={styles.card}>
           <Text style={styles.cardTitle}>Комментарии · {comments.length}</Text>
-          {comments.map((c, i) => (
-            <View key={c.id ?? i} style={styles.commentRow}>
-              <Avatar name={userDisplayName(c.author)} size={28} />
-              <View style={styles.commentBody}>
-                <View style={styles.commentHeaderRow}>
-                  <Text style={styles.commentAuthor}>{userDisplayName(c.author)}</Text>
-                  <Text style={styles.commentTime}>{formatRelative(c.created_at ?? c.create_date)}</Text>
+          {comments.map((c, i) => {
+            const author = commentAuthor(c);
+            return (
+              <View key={c.id ?? i} style={styles.commentRow}>
+                <Avatar name={userDisplayName(author)} uri={author?.photo?.url} size={28} />
+                <View style={styles.commentBody}>
+                  <View style={styles.commentHeaderRow}>
+                    <Text style={styles.commentAuthor}>{userDisplayName(author) || 'Пользователь'}</Text>
+                    <Text style={styles.commentTime}>{formatRelative(commentDate(c))}</Text>
+                  </View>
+                  <RichText html={c.text ?? c.body} style={styles.commentText} />
                 </View>
-                <Text style={styles.commentText}>{stripHtml(c.text ?? c.body)}</Text>
               </View>
-            </View>
-          ))}
+            );
+          })}
 
           <View style={styles.composerRow}>
             <TextInput
@@ -388,24 +431,29 @@ export default function TaskDetailScreen() {
         </Card>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-        <SecondaryButton icon="create-outline" iconOnly style={styles.footerIconButton} />
-        {canTransition ? (
-          <PrimaryButton
-            label={action.ctaLabel}
-            icon="checkmark"
-            loading={statusPending}
-            onPress={onTakeAction}
-            style={styles.footerPrimary}
-          />
-        ) : action ? (
-          <View style={[styles.footerPrimary, styles.footerHint]}>
-            <Text style={styles.footerHintText}>Доступно только исполнителю задачи</Text>
+      {myTransitions.length ? (
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+          {myTransitions.map((g, i) => {
+            const Btn = i === 0 ? PrimaryButton : SecondaryButton;
+            return (
+              <Btn
+                key={g.id}
+                label={g.action_name}
+                loading={statusPending === g.to_status_id}
+                disabled={statusPending != null && statusPending !== g.to_status_id}
+                onPress={() => onChangeStatus(g.to_status_id)}
+                style={styles.footerBtn}
+              />
+            );
+          })}
+        </View>
+      ) : statusTransitions.length ? (
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+          <View style={styles.footerHint}>
+            <Text style={styles.footerHintText}>Смена статуса недоступна для вашей роли</Text>
           </View>
-        ) : (
-          <View style={styles.footerPrimary} />
-        )}
-      </View>
+        </View>
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -471,16 +519,14 @@ const styles = StyleSheet.create({
     maxHeight: 80,
   },
   footer: {
-    flexDirection: 'row',
-    gap: 10,
     paddingHorizontal: 16,
     paddingTop: 12,
+    gap: 8,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.line,
   },
-  footerIconButton: { width: 54 },
-  footerPrimary: { flex: 1 },
+  footerBtn: { width: '100%' },
   footerHint: {
     height: 56,
     borderRadius: 12,

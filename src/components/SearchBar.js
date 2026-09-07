@@ -1,4 +1,4 @@
-import { View, TextInput, StyleSheet } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontFamily } from '../theme/theme';
 
@@ -12,7 +12,14 @@ export default function SearchBar({ value, onChangeText, placeholder, style }) {
         placeholder={placeholder}
         placeholderTextColor="rgba(255,255,255,0.7)"
         style={styles.input}
+        returnKeyType="search"
+        clearButtonMode="while-editing"
       />
+      {value ? (
+        <TouchableOpacity onPress={() => onChangeText('')} hitSlop={8} accessibilityLabel="Очистить">
+          <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.85)" />
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }

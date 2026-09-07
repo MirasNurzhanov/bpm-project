@@ -10,6 +10,21 @@ export async function getCreatedTasks() {
   return unwrapList(await request('/api/processes/simpletask/me/created/'));
 }
 
+export async function getSpectatorTasks() {
+  return unwrapList(await request('/api/processes/simpletask/me/spectator/'));
+}
+
+export async function getSubordinateTasks() {
+  return unwrapList(await request('/api/processes/simpletask/me/subordinates/'));
+}
+
+// { statuses: { "<id>": {...} }, graph: [{ from_status_id, to_status_id, action_name,
+//   can_assignee_advance, can_initiator_advance }] }
+export async function getTaskStatusGraph() {
+  const data = await request('/api/processes/simpletask/statuses/');
+  return { statuses: data?.statuses ?? {}, graph: data?.statusGraph ?? [] };
+}
+
 export async function getTask(id) {
   const data = await request(`/api/processes/simpletask/${id}/`);
   return data?.object ?? data;
@@ -72,6 +87,47 @@ export function createTask({
       spectators,
       // Files are embedded inline (base64 data URLs), not uploaded separately.
       new_files: newFiles,
+    },
+  });
+}
+
+export function getTaskUpdateForm(id) {
+  return request(`/api/processes/simpletask/${id}/update/`);
+}
+
+export function updateTask(id, {
+  title,
+  description,
+  project,
+  assignee,
+  position = null,
+  milestone = null,
+  deadline,
+  priority,
+  tags = [],
+  assistants = [],
+  spectators = [],
+  flag = false,
+  isRepeating = false,
+  cronExpression = '0 0 * * *',
+}) {
+  return request(`/api/processes/simpletask/${id}/update/`, {
+    method: 'POST',
+    body: {
+      title,
+      description,
+      project,
+      assignee,
+      position,
+      milestone,
+      deadline,
+      priority,
+      tags,
+      assistants,
+      spectators,
+      flag,
+      is_repeating: isRepeating,
+      cron_expression: cronExpression,
     },
   });
 }
