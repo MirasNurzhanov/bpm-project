@@ -242,6 +242,7 @@ export default function TaskDetailScreen() {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SolidHeader
+        style={styles.headerCompact}
         left={
           <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
             <Ionicons name="chevron-back" size={22} color={colors.surface} />
@@ -271,14 +272,7 @@ export default function TaskDetailScreen() {
           <Text style={styles.code}>{code}</Text>
           <StatusPill label={status.label} tone={status.tone} />
         </View>
-        <Text style={styles.title}>{task.title}</Text>
-        {(projectName || task.deadline) ? (
-          <Text style={styles.subtitle}>
-            {projectName}
-            {projectName && task.deadline ? ' · ' : ''}
-            {task.deadline ? formatDateTime(task.deadline) : ''}
-          </Text>
-        ) : null}
+        <Text style={styles.title} numberOfLines={2}>{task.title}</Text>
       </SolidHeader>
 
       <ScrollView style={styles.flex} contentContainerStyle={styles.body}>
@@ -290,6 +284,7 @@ export default function TaskDetailScreen() {
         ) : null}
 
         <Card style={styles.card}>
+          {projectName ? <InfoRow icon="folder-outline" label="Проект" value={projectName} /> : null}
           <InfoRow icon="person-outline" label="Автор" value={authorName} />
           <InfoRow icon="person-circle-outline" label="Исполнитель" value={assigneeName} />
           <InfoRow icon="calendar-outline" label="Создано" value={formatDateTime(task.create_date)} />
@@ -432,7 +427,7 @@ export default function TaskDetailScreen() {
       </ScrollView>
 
       {myTransitions.length ? (
-        <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+        <View style={[styles.footer, styles.footerRow, { paddingBottom: insets.bottom + 10 }]}>
           {myTransitions.map((g, i) => {
             const Btn = i === 0 ? PrimaryButton : SecondaryButton;
             return (
@@ -460,10 +455,10 @@ export default function TaskDetailScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.bg },
+  headerCompact: { paddingBottom: 14, gap: 10 },
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   code: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.primary200 },
-  title: { fontFamily: fontFamily.semiBold, fontSize: 19, color: colors.surface },
-  subtitle: { fontFamily: fontFamily.regular, fontSize: 13, color: colors.primary200 },
+  title: { fontFamily: fontFamily.semiBold, fontSize: 18, color: colors.surface, lineHeight: 23 },
   body: { padding: 16, gap: 12, paddingBottom: 32 },
   card: { gap: 8 },
   cardTitle: { fontFamily: fontFamily.semiBold, fontSize: 15, color: colors.text },
@@ -520,15 +515,16 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 10,
     gap: 8,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.line,
   },
-  footerBtn: { width: '100%' },
+  footerRow: { flexDirection: 'row', flexWrap: 'wrap' },
+  footerBtn: { flexGrow: 1, flexBasis: 140, height: 46 },
   footerHint: {
-    height: 56,
+    height: 44,
     borderRadius: 12,
     backgroundColor: colors.fill,
     alignItems: 'center',

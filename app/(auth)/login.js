@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   ScrollView,
+  Keyboard,
   Platform,
   StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/hooks/useAuth';
 import { ApiError } from '../../src/api/client';
@@ -21,12 +23,23 @@ import { colors, fontFamily } from '../../src/theme/theme';
 export default function LoginScreen() {
   const { login } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardOpen(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const canSubmit = username.trim().length > 0 && password.length > 0 && !loading;
 
@@ -55,16 +68,25 @@ export default function LoginScreen() {
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <GradientHeader>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+      >
+        <GradientHeader
+          style={keyboardOpen ? { paddingTop: insets.top + 12, paddingBottom: 16 } : undefined}
+        >
           <View style={styles.badge}>
             <Text style={styles.badgeText}>7</Text>
           </View>
           <Text style={styles.wordmark}>SevenDS</Text>
-          <Text style={styles.tagline}>Задачи, проекты и процессы вашей компании — в кармане</Text>
+          {!keyboardOpen ? (
+            <Text style={styles.tagline}>Задачи, проекты и процессы вашей компании — в кармане</Text>
+          ) : null}
         </GradientHeader>
 
-        <View style={styles.form}>
+        <View style={[styles.form, keyboardOpen && styles.formCompact]}>
           <Text style={styles.heading}>Вход в систему</Text>
 
           <View style={styles.field}>
@@ -160,6 +182,7 @@ const styles = StyleSheet.create({
   wordmark: { fontFamily: fontFamily.bold, fontSize: 22, color: colors.surface },
   tagline: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.primary200, lineHeight: 20 },
   form: { paddingHorizontal: 28, paddingTop: 32, paddingBottom: 40, gap: 20 },
+  formCompact: { paddingTop: 18, gap: 14 },
   heading: { fontFamily: fontFamily.semiBold, fontSize: 20, color: colors.text },
   field: { gap: 6 },
   fieldLabel: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.muted },
