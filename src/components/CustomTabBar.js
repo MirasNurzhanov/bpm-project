@@ -7,6 +7,7 @@ import { colors, fontFamily } from '../theme/theme';
 const ICONS = {
   index: 'home',
   tasks: 'checkbox',
+  approvals: 'git-network',
   projects: 'folder',
   profile: 'person',
 };
@@ -14,6 +15,7 @@ const ICONS = {
 const LABELS = {
   index: 'Главная',
   tasks: 'Задачи',
+  approvals: 'Процессы',
   projects: 'Проекты',
   profile: 'Профиль',
 };

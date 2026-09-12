@@ -98,6 +98,12 @@ export function formatFileSize(bytes) {
   return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[i]}`;
 }
 
+export function formatMoney(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '';
+  return n.toLocaleString('ru-RU');
+}
+
 export function greeting(date = new Date()) {
   const h = date.getHours();
   if (h < 6) return 'Доброй ночи';

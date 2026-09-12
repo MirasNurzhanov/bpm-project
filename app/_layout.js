@@ -40,6 +40,8 @@ export default function RootLayout() {
             <Stack.Screen name="new-task" options={{ presentation: 'modal' }} />
             <Stack.Screen name="project/[id]" />
             <Stack.Screen name="new-project" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="approval/[id]" />
+            <Stack.Screen name="new-approval" options={{ presentation: 'modal' }} />
             <Stack.Screen name="settings" />
             <Stack.Screen name="efficiency" />
             <Stack.Screen name="tags" />
