@@ -59,7 +59,7 @@ export default function NewApprovalScreen() {
     setTitle(editProcess.title ?? '');
     setDescription(stripHtml(editProcess.description) || editProcess.description || '');
     if (editProcess.money_amount != null) setMoneyAmount(String(editProcess.money_amount));
-    const t = editProcess.type ?? editProcess.document_type;
+    const t = editProcess.doc_type ?? editProcess.type ?? editProcess.document_type;
     if (t) setType({ id: toId(t), label: t.name ?? t.title ?? '' });
   }, [editProcess]);
 
@@ -80,8 +80,9 @@ export default function NewApprovalScreen() {
     const body = {
       title: title.trim(),
       description: description.trim(),
-      type: type.id,
+      doc_type: type.id,
       money_amount: moneyAmount.trim() ? Number(moneyAmount.trim()) : null,
+      new_files: null,
     };
     try {
       if (isEdit) {

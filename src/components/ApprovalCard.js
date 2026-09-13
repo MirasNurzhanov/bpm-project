@@ -10,7 +10,7 @@ export default function ApprovalCard({ process: p }) {
   const router = useRouter();
   const status = approvalStatusInfo(p);
   const code = p.slug ?? `#${p.id ?? p.pk}`;
-  const typeName = p.type?.name ?? p.document_type?.name ?? '';
+  const typeName = p.doc_type?.name ?? p.type?.name ?? p.document_type?.name ?? '';
   const initiatorName = userDisplayName(p.initiator);
   const money = formatMoney(p.money_amount);
 

@@ -105,7 +105,7 @@ export default function ApprovalDetailScreen() {
   const statusId = approvalStatusId(process);
   const status = approvalStatusInfo(process);
   const code = process.slug ?? `#${process.id ?? process.pk}`;
-  const typeName = process.type?.name ?? process.document_type?.name ?? '';
+  const typeName = process.doc_type?.name ?? process.type?.name ?? process.document_type?.name ?? '';
   const initiatorName = userDisplayName(process.initiator) || '—';
   const isInitiator =
     (process.initiator?.id ?? process.initiator?.pk ?? process.initiator_id) === user?.id;
