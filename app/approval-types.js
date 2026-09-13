@@ -113,8 +113,16 @@ export default function ApprovalTypesScreen() {
         ) : (
           <Card style={styles.listCard}>
             {types.map((t, i) => (
-              <View key={t.id ?? t.pk ?? i} style={[styles.typeRow, i > 0 && styles.typeRowBorder]}>
-                <Text style={styles.typeName} numberOfLines={1}>{t.name ?? t.str}</Text>
+              <TouchableOpacity
+                key={t.id ?? t.pk ?? i}
+                style={[styles.typeRow, i > 0 && styles.typeRowBorder]}
+                onPress={() => router.push(`/approval-type/${t.id ?? t.pk}`)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.typeRowTop}>
+                  <Text style={styles.typeName} numberOfLines={1}>{t.name ?? t.str}</Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.chevron} />
+                </View>
                 <View style={styles.typeBadges}>
                   {t.payment_status ? (
                     <View style={styles.badge}><Text style={styles.badgeText}>Сумма</Text></View>
@@ -123,7 +131,7 @@ export default function ApprovalTypesScreen() {
                     <View style={styles.badge}><Text style={styles.badgeText}>Предмет</Text></View>
                   ) : null}
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </Card>
         )}
@@ -167,7 +175,8 @@ const styles = StyleSheet.create({
   listCard: { paddingVertical: 4 },
   typeRow: { paddingVertical: 12, gap: 8 },
   typeRowBorder: { borderTopWidth: 1, borderTopColor: colors.line },
-  typeName: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.text },
+  typeRowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  typeName: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.text, flex: 1 },
   typeBadges: { flexDirection: 'row', gap: 6 },
   badge: {
     backgroundColor: colors.fill,

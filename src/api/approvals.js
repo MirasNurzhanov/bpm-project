@@ -115,6 +115,40 @@ export function getApprovalTypeCreateForm() {
   return request('/api/processes/document-approval-types/create/');
 }
 
+// --- Approval stages (the actual approver chain for a type) -----------------
+// A type's stages form a chain via previous_approval_stage (null = first
+// stage). Creating a type does NOT create any stages; they're added one at a
+// time here, each pointing at the previous one.
+export function getApprovalStageCreateForm(typeId) {
+  return request(`/api/processes/document-approval-stages/${typeId}/create/`);
+}
+
+export function createApprovalStage(typeId, {
+  name,
+  previousStageId = null,
+  position,
+  moneyChange = false,
+  approvalType = 'sogl', // 'sogl' Согласование | 'ispl' Исполнение
+  author = null,
+}) {
+  return request(`/api/processes/document-approval-stages/${typeId}/create/`, {
+    method: 'POST',
+    body: {
+      name,
+      doc_type: typeId,
+      previous_approval_stage: previousStageId,
+      position,
+      money_change: moneyChange,
+      approval_type: approvalType,
+      author,
+    },
+  });
+}
+
+export async function getApprovalTypeStages(typeId) {
+  return unwrapList(await request(`/api/processes/document-approval-types/${typeId}/stages/`));
+}
+
 export function createApprovalType({
   name,
   company,

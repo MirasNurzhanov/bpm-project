@@ -43,6 +43,7 @@ export default function RootLayout() {
             <Stack.Screen name="approval/[id]" />
             <Stack.Screen name="new-approval" options={{ presentation: 'modal' }} />
             <Stack.Screen name="approval-types" />
+            <Stack.Screen name="approval-type/[id]" />
             <Stack.Screen name="settings" />
             <Stack.Screen name="efficiency" />
             <Stack.Screen name="tags" />
