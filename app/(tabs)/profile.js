@@ -68,8 +68,13 @@ export default function ProfileScreen() {
           <SettingsRow
             icon="pricetags-outline"
             label="Тэги и справочники"
-            last
             onPress={() => router.push('/tags')}
+          />
+          <SettingsRow
+            icon="git-network-outline"
+            label="Типы процессов"
+            last
+            onPress={() => router.push('/approval-types')}
           />
         </Card>
 

@@ -100,11 +100,40 @@ export function decideStage(id, { stageId, approve, comment }) {
 }
 
 // --- Process types ------------------------------------------------------------
+// Type: { id, name, str ("<name> (<company>)"), company, first_stage_id,
+// payment_status, subject_required, jobs_positions, author }. Creating a type
+// does NOT attach an approval stage chain — first_stage_id comes back null;
+// that's a separate, not-yet-documented mechanism.
 export async function getApprovalTypes() {
   return unwrapList(await request('/api/processes/document-approval-types/'));
 }
 export async function getApprovalTypesSimple() {
   return unwrapList(await request('/api/processes/document-approval-types/simple/'));
+}
+
+export function getApprovalTypeCreateForm() {
+  return request('/api/processes/document-approval-types/create/');
+}
+
+export function createApprovalType({
+  name,
+  company,
+  paymentStatus = false,
+  subjectRequired = false,
+  jobsPositions = [],
+  author = null,
+}) {
+  return request('/api/processes/document-approval-types/create/', {
+    method: 'POST',
+    body: {
+      name,
+      company,
+      payment_status: paymentStatus,
+      subject_required: subjectRequired,
+      jobs_positions: jobsPositions,
+      author,
+    },
+  });
 }
 
 // --- Badges / notifications --------------------------------------------------
