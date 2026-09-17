@@ -140,6 +140,32 @@ export default function ApprovalDetailScreen() {
     }
   };
 
+  const onRecall = () => {
+    Alert.alert(
+      'Отозвать процесс',
+      'Процесс вернётся в черновики, история согласования будет очищена. Продолжить?',
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Отозвать',
+          style: 'destructive',
+          onPress: async () => {
+            setStatusPending(true);
+            try {
+              await updateApprovalStatus(process.id ?? process.pk, APPROVAL_DRAFT);
+              await refetch();
+              await refetchHistory();
+            } catch (e) {
+              Alert.alert('Ошибка', formatApiErrorMessage(e, 'Не удалось отозвать процесс.'));
+            } finally {
+              setStatusPending(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const onDelete = () => {
     Alert.alert('Удалить процесс', `Удалить «${process.title ?? process.str}»?`, [
       { text: 'Отмена', style: 'cancel' },
@@ -347,6 +373,16 @@ export default function ApprovalDetailScreen() {
               style={styles.footerBtn}
             />
           </View>
+          {isInitiator ? (
+            <SecondaryButton
+              label="Отозвать"
+              tone="danger"
+              loading={statusPending}
+              disabled={decisionPending != null}
+              onPress={onRecall}
+              style={styles.footerBtn}
+            />
+          ) : null}
         </View>
       ) : statusId === APPROVAL_REJECTED && rejectedStageId ? (
         <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
