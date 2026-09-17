@@ -122,10 +122,16 @@ export default function ApprovalDetailScreen() {
     console.log('[approval] stage history raw ->', JSON.stringify(history).slice(0, 3000));
   }
 
+  // The process itself points at its current stage (confirmed from the
+  // create-form's instance dict: current_stage_object_id) — prefer that over
+  // guessing from the last stage_history entry.
   const currentStage = history[history.length - 1] ?? null;
-  const currentStageId = stageIdOf(currentStage);
+  const currentStageId = process.current_stage_object_id ?? stageIdOf(currentStage);
+  // For revoke, the specific rejected stage matters more than "current" (the
+  // process's current_stage may already be cleared once rejected) — prefer
+  // the history entry, fall back to current_stage_object_id.
   const rejectedStage = [...history].reverse().find((h) => stageDecisionLabel(h).label === 'Отклонено');
-  const rejectedStageId = stageIdOf(rejectedStage);
+  const rejectedStageId = stageIdOf(rejectedStage) ?? process.current_stage_object_id;
 
   const onSendToApproval = async () => {
     setStatusPending(true);

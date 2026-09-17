@@ -21,6 +21,7 @@ import {
   updateApproval,
   getApproval,
   getApprovalTypesSimple,
+  getApprovalCreateForm,
 } from '../src/api/approvals';
 import { buildNewFiles } from '../src/api/attachments';
 import { formatApiErrorMessage } from '../src/api/client';
@@ -40,20 +41,39 @@ export default function NewApprovalScreen() {
   const isEdit = Boolean(editId);
 
   const { data: typesData } = useFetch(getApprovalTypesSimple, []);
+  const { data: createForm } = useFetch(getApprovalCreateForm, []);
   const { data: editProcess } = useFetch(
     () => (editId ? getApproval(editId) : Promise.resolve(null)),
     [editId]
   );
   const types = (typesData ?? []).map((t) => ({ id: t.id ?? t.pk, label: t.name ?? t.title ?? t.str }));
+  const currencyOptions = (createForm?.form?.fields?.currency?._choices ?? []).map(([id, label]) => ({
+    id,
+    label,
+  }));
+  const subjectOptions = (createForm?.form?.fields?.subject?._choices ?? []).map(([id, label]) => ({
+    id,
+    label,
+  }));
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [moneyAmount, setMoneyAmount] = useState('');
   const [type, setType] = useState(null);
+  const [currency, setCurrency] = useState(null);
+  const [subject, setSubject] = useState(null);
   const [attachments, setAttachments] = useState([]);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
+  const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
+  const [subjectPickerOpen, setSubjectPickerOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
+
+  // The selected type tells us whether currency/subject are actually needed
+  // for this kind of process (payment_status / subject_required flags).
+  const selectedTypeRaw = (typesData ?? []).find((t) => (t.id ?? t.pk) === type?.id);
+  const needsCurrency = Boolean(selectedTypeRaw?.payment_status);
+  const needsSubject = Boolean(selectedTypeRaw?.subject_required);
 
   const prefilled = useRef(false);
   useEffect(() => {
@@ -64,7 +84,19 @@ export default function NewApprovalScreen() {
     if (editProcess.money_amount != null) setMoneyAmount(String(editProcess.money_amount));
     const t = editProcess.doc_type ?? editProcess.type ?? editProcess.document_type;
     if (t) setType({ id: toId(t), label: t.name ?? t.title ?? '' });
+    const c = editProcess.currency;
+    if (c) setCurrency({ id: toId(c), label: c.name ?? c.title ?? '' });
+    const s = editProcess.subject;
+    if (s) setSubject({ id: toId(s), label: s.name ?? s.title ?? '' });
   }, [editProcess]);
+
+  // Only one currency exists right now — pick it automatically once it's
+  // needed, instead of making the user open a single-option picker.
+  useEffect(() => {
+    if (needsCurrency && !currency && currencyOptions.length === 1) {
+      setCurrency(currencyOptions[0]);
+    }
+  }, [needsCurrency, currency, currencyOptions]);
 
   const clearFieldError = (field) => {
     setFieldErrors((errors) => (errors[field] ? { ...errors, [field]: undefined } : errors));
@@ -104,6 +136,8 @@ export default function NewApprovalScreen() {
       description: description.trim(),
       doc_type: type.id,
       money_amount: moneyAmount.trim() ? Number(moneyAmount.trim()) : null,
+      currency: currency?.id ?? null,
+      subject: subject?.id ?? null,
       new_files: newFiles,
     };
     try {
@@ -124,6 +158,8 @@ export default function NewApprovalScreen() {
     const errors = {};
     if (!title.trim()) errors.title = 'Укажите название';
     if (!type) errors.type = 'Выберите тип процесса';
+    if (needsCurrency && !currency) errors.currency = 'Выберите валюту';
+    if (needsSubject && !subject) errors.subject = 'Выберите предмет';
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
       return;
@@ -213,6 +249,34 @@ export default function NewApprovalScreen() {
             </Text>
             <Ionicons name="chevron-forward" size={16} color={colors.chevron} />
           </TouchableOpacity>
+
+          {needsCurrency ? (
+            <TouchableOpacity
+              style={[styles.pickerRow, styles.border]}
+              onPress={() => { setCurrencyPickerOpen(true); clearFieldError('currency'); }}
+            >
+              <Ionicons name="cash-outline" size={18} color={colors.muted} />
+              <Text style={styles.pickerLabel}>Валюта</Text>
+              <Text style={[styles.pickerValue, fieldErrors.currency && styles.pickerValueError]} numberOfLines={1}>
+                {currency?.label ?? 'Не выбрана'}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.chevron} />
+            </TouchableOpacity>
+          ) : null}
+
+          {needsSubject ? (
+            <TouchableOpacity
+              style={[styles.pickerRow, styles.border]}
+              onPress={() => { setSubjectPickerOpen(true); clearFieldError('subject'); }}
+            >
+              <Ionicons name="business-outline" size={18} color={colors.muted} />
+              <Text style={styles.pickerLabel}>Предмет</Text>
+              <Text style={[styles.pickerValue, fieldErrors.subject && styles.pickerValueError]} numberOfLines={1}>
+                {subject?.label ?? 'Не выбран'}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.chevron} />
+            </TouchableOpacity>
+          ) : null}
         </Card>
 
         {!isEdit ? (
@@ -259,6 +323,24 @@ export default function NewApprovalScreen() {
         onSelect={(item) => { setType(item); setTypePickerOpen(false); }}
         onClose={() => setTypePickerOpen(false)}
       />
+
+      <PickerModal
+        visible={currencyPickerOpen}
+        title="Выберите валюту"
+        options={currencyOptions}
+        selectedId={currency?.id}
+        onSelect={(item) => { setCurrency(item); setCurrencyPickerOpen(false); }}
+        onClose={() => setCurrencyPickerOpen(false)}
+      />
+
+      <PickerModal
+        visible={subjectPickerOpen}
+        title="Выберите предмет"
+        options={subjectOptions}
+        selectedId={subject?.id}
+        onSelect={(item) => { setSubject(item); setSubjectPickerOpen(false); }}
+        onClose={() => setSubjectPickerOpen(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -284,7 +366,8 @@ const styles = StyleSheet.create({
   input: { fontFamily: fontFamily.regular, fontSize: 15, color: colors.text, paddingVertical: 4 },
   multiline: { minHeight: 60, textAlignVertical: 'top' },
   error: { fontFamily: fontFamily.regular, fontSize: 12, color: colors.danger },
-  pickerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
+  pickerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
+  border: { borderTopWidth: 1, borderColor: colors.line },
   pickerLabel: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.text, flex: 1 },
   pickerValue: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.muted, maxWidth: 150 },
   pickerValueError: { color: colors.danger },
