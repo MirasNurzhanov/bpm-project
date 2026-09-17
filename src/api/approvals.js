@@ -25,6 +25,12 @@ export async function getDraftApprovals() {
   return unwrapList(await request(`${BASE}/draft/`));
 }
 
+// Confirmed via a real request: /api/bpm/attachment/approvaldocument/<id>/
+// (same shape/convention as task attachments: /api/bpm/attachment/simpletask/<id>/)
+export async function getApprovalAttachments(id) {
+  return unwrapList(await request(`/api/bpm/attachment/approvaldocument/${id}/`));
+}
+
 // --- Single process ----------------------------------------------------------
 export async function getApproval(id) {
   const data = await request(`${BASE}/${id}/`);

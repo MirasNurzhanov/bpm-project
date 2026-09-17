@@ -2,12 +2,14 @@ import { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
+  Image,
   TextInput,
   ScrollView,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Linking,
   StyleSheet,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -19,12 +21,14 @@ import { useRequireAuth } from '../../src/hooks/useRequireAuth';
 import {
   getApproval,
   getStageHistory,
+  getApprovalAttachments,
   updateApprovalStatus,
   decideStage,
   revokeStageDecision,
   deleteApprovals,
 } from '../../src/api/approvals';
 import { formatApiErrorMessage } from '../../src/api/client';
+import { attachmentUrl, attachmentName, attachmentThumb } from '../../src/utils/attachmentDisplay';
 import SolidHeader from '../../src/components/SolidHeader';
 import Card from '../../src/components/Card';
 import StatusPill from '../../src/components/StatusPill';
@@ -42,7 +46,7 @@ import {
   APPROVAL_PENDING,
   APPROVAL_REJECTED,
 } from '../../src/utils/approvalStatus';
-import { formatDateTime, formatMoney, userDisplayName } from '../../src/utils/format';
+import { formatDateTime, formatFileSize, formatMoney, userDisplayName } from '../../src/utils/format';
 
 function stageDecisionLabel(h) {
   if (h?.approve_bool === true) return { label: 'Одобрено', tone: 'success' };
@@ -74,6 +78,7 @@ export default function ApprovalDetailScreen() {
 
   const { data: process, loading, error, refetch } = useFetch(() => getApproval(id), [id]);
   const { data: historyData, refetch: refetchHistory } = useFetch(() => getStageHistory(id), [id]);
+  const { data: attachmentsData } = useFetch(() => getApprovalAttachments(id), [id]);
 
   const [comment, setComment] = useState('');
   const [decisionPending, setDecisionPending] = useState(null); // 'approve' | 'reject' | null
@@ -102,6 +107,7 @@ export default function ApprovalDetailScreen() {
   }
 
   const history = historyData ?? [];
+  const attachments = attachmentsData ?? [];
   const statusId = approvalStatusId(process);
   const status = approvalStatusInfo(process);
   const code = process.slug ?? `#${process.id ?? process.pk}`;
@@ -170,6 +176,21 @@ export default function ApprovalDetailScreen() {
     }
   };
 
+  const onOpenAttachment = async (a) => {
+    const url = attachmentUrl(a);
+    if (!url) {
+      Alert.alert('Файл недоступен', 'Для этого вложения не пришла ссылка на файл.');
+      return;
+    }
+    try {
+      const ok = await Linking.canOpenURL(url);
+      if (!ok) throw new Error('cannot open');
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Ошибка', 'Не удалось открыть файл.');
+    }
+  };
+
   const onRevoke = async () => {
     if (!rejectedStageId) return;
     setRevokePending(true);
@@ -225,6 +246,37 @@ export default function ApprovalDetailScreen() {
           <InfoRow icon="calendar-outline" label="Создано" value={formatDateTime(process.create_date)} />
           {money ? <InfoRow icon="cash-outline" label="Сумма" value={money} /> : null}
         </Card>
+
+        {attachments.length ? (
+          <Card style={styles.card}>
+            <Text style={styles.cardTitle}>Вложения · {attachments.length}</Text>
+            {attachments.map((a, i) => {
+              const meta = [formatFileSize(a.size), formatDateTime(a.created_at ?? a.uploaded_at)]
+                .filter(Boolean)
+                .join(' · ');
+              const thumb = attachmentThumb(a);
+              return (
+                <TouchableOpacity
+                  key={a.id ?? a.pk ?? i}
+                  style={styles.attachmentRow}
+                  onPress={() => onOpenAttachment(a)}
+                  activeOpacity={0.7}
+                >
+                  {thumb ? (
+                    <Image source={{ uri: thumb }} style={styles.attachmentThumb} />
+                  ) : (
+                    <Ionicons name="document-attach-outline" size={18} color={colors.muted} />
+                  )}
+                  <View style={styles.attachmentInfo}>
+                    <Text style={styles.attachmentName} numberOfLines={1}>{attachmentName(a)}</Text>
+                    {meta ? <Text style={styles.attachmentMeta}>{meta}</Text> : null}
+                  </View>
+                  <Ionicons name="download-outline" size={18} color={colors.muted} />
+                </TouchableOpacity>
+              );
+            })}
+          </Card>
+        ) : null}
 
         {history.length ? (
           <Card style={styles.card}>
@@ -326,6 +378,11 @@ const styles = StyleSheet.create({
   stageActor: { fontFamily: fontFamily.regular, fontSize: 12, color: colors.muted },
   stageComment: { fontFamily: fontFamily.regular, fontSize: 13, color: colors.text2, marginTop: 2 },
   stageDate: { fontFamily: fontFamily.regular, fontSize: 11, color: colors.muted3, marginTop: 2 },
+  attachmentRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  attachmentThumb: { width: 32, height: 32, borderRadius: 6, backgroundColor: colors.fill },
+  attachmentInfo: { flex: 1 },
+  attachmentName: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.text },
+  attachmentMeta: { fontFamily: fontFamily.regular, fontSize: 12, color: colors.muted },
   footer: {
     paddingHorizontal: 16,
     paddingTop: 10,

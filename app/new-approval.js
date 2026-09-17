@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFetch } from '../src/hooks/useFetch';
 import { useRequireAuth } from '../src/hooks/useRequireAuth';
@@ -21,12 +22,13 @@ import {
   getApproval,
   getApprovalTypesSimple,
 } from '../src/api/approvals';
+import { buildNewFiles } from '../src/api/attachments';
 import { formatApiErrorMessage } from '../src/api/client';
 import Card from '../src/components/Card';
 import PickerModal from '../src/components/PickerModal';
 import PrimaryButton from '../src/components/PrimaryButton';
 import { colors, fontFamily } from '../src/theme/theme';
-import { stripHtml } from '../src/utils/format';
+import { stripHtml, formatFileSize } from '../src/utils/format';
 
 const toId = (v) => (v && typeof v === 'object' ? (v.id ?? v.pk) : v);
 
@@ -48,6 +50,7 @@ export default function NewApprovalScreen() {
   const [description, setDescription] = useState('');
   const [moneyAmount, setMoneyAmount] = useState('');
   const [type, setType] = useState(null);
+  const [attachments, setAttachments] = useState([]);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -67,22 +70,41 @@ export default function NewApprovalScreen() {
     setFieldErrors((errors) => (errors[field] ? { ...errors, [field]: undefined } : errors));
   };
 
-  const onSubmit = async () => {
-    const errors = {};
-    if (!title.trim()) errors.title = 'Укажите название';
-    if (!type) errors.type = 'Выберите тип процесса';
-    if (Object.keys(errors).length) {
-      setFieldErrors(errors);
-      return;
+  const pickAttachments = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+      if (res.canceled || !res.assets?.length) return;
+      setAttachments((list) => [
+        ...list,
+        ...res.assets.map((a) => ({
+          key: `${a.name}-${a.size ?? 0}-${a.lastModified ?? Date.now()}-${Math.random().toString(36).slice(2)}`,
+          name: a.name,
+          size: a.size,
+          mimeType: a.mimeType,
+          uri: a.uri,
+          file: a.file,
+        })),
+      ]);
+    } catch {
+      Alert.alert('Ошибка', 'Не удалось открыть выбор файлов.');
     }
-    setFieldErrors({});
+  };
+
+  const removeAttachment = (key) => {
+    setAttachments((list) => list.filter((a) => a.key !== key));
+  };
+
+  const submitApproval = async (newFiles) => {
     setSubmitting(true);
     const body = {
       title: title.trim(),
       description: description.trim(),
       doc_type: type.id,
       money_amount: moneyAmount.trim() ? Number(moneyAmount.trim()) : null,
-      new_files: null,
+      new_files: newFiles,
     };
     try {
       if (isEdit) {
@@ -96,6 +118,40 @@ export default function NewApprovalScreen() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const onSubmit = async () => {
+    const errors = {};
+    if (!title.trim()) errors.title = 'Укажите название';
+    if (!type) errors.type = 'Выберите тип процесса';
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors);
+      return;
+    }
+    setFieldErrors({});
+
+    if (isEdit || !attachments.length) {
+      submitApproval(null);
+      return;
+    }
+
+    setSubmitting(true);
+    let newFiles;
+    try {
+      newFiles = await buildNewFiles(attachments);
+    } catch (e) {
+      setSubmitting(false);
+      Alert.alert(
+        'Вложения не загрузились',
+        formatApiErrorMessage(e, 'Не удалось прочитать файлы.') + '\n\nСоздать процесс без вложений?',
+        [
+          { text: 'Отмена', style: 'cancel' },
+          { text: 'Создать без вложений', onPress: () => submitApproval(null) },
+        ]
+      );
+      return;
+    }
+    submitApproval(newFiles);
   };
 
   return (
@@ -158,6 +214,32 @@ export default function NewApprovalScreen() {
             <Ionicons name="chevron-forward" size={16} color={colors.chevron} />
           </TouchableOpacity>
         </Card>
+
+        {!isEdit ? (
+          <Card style={styles.card}>
+            <Text style={styles.cardTitle}>
+              Вложения{attachments.length ? ` · ${attachments.length}` : ''}
+            </Text>
+            {attachments.map((a) => (
+              <View key={a.key} style={styles.attachmentRow}>
+                <Ionicons name="document-outline" size={18} color={colors.muted} />
+                <View style={styles.attachmentInfo}>
+                  <Text style={styles.attachmentName} numberOfLines={1}>{a.name}</Text>
+                  {formatFileSize(a.size) ? (
+                    <Text style={styles.attachmentMeta}>{formatFileSize(a.size)}</Text>
+                  ) : null}
+                </View>
+                <TouchableOpacity onPress={() => removeAttachment(a.key)} hitSlop={8}>
+                  <Ionicons name="close-circle" size={20} color={colors.muted3} />
+                </TouchableOpacity>
+              </View>
+            ))}
+            <TouchableOpacity style={styles.dropzone} onPress={pickAttachments} activeOpacity={0.7}>
+              <Ionicons name="cloud-upload-outline" size={22} color={colors.muted2} />
+              <Text style={styles.dropzoneText}>Прикрепить файл</Text>
+            </TouchableOpacity>
+          </Card>
+        ) : null}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
@@ -206,6 +288,21 @@ const styles = StyleSheet.create({
   pickerLabel: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.text, flex: 1 },
   pickerValue: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.muted, maxWidth: 150 },
   pickerValueError: { color: colors.danger },
+  cardTitle: { fontFamily: fontFamily.semiBold, fontSize: 15, color: colors.text },
+  dropzone: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.dash,
+    borderRadius: 10,
+    paddingVertical: 20,
+    alignItems: 'center',
+    gap: 6,
+  },
+  dropzoneText: { fontFamily: fontFamily.regular, fontSize: 13, color: colors.muted },
+  attachmentRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
+  attachmentInfo: { flex: 1 },
+  attachmentName: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.text },
+  attachmentMeta: { fontFamily: fontFamily.regular, fontSize: 12, color: colors.muted },
   footer: {
     paddingHorizontal: 16,
     paddingTop: 12,

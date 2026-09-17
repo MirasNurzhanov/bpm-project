@@ -29,6 +29,7 @@ import {
   getTaskStatusGraph,
 } from '../../src/api/tasks';
 import { getTags } from '../../src/api/tags';
+import { attachmentUrl, attachmentName, attachmentThumb } from '../../src/utils/attachmentDisplay';
 import { ApiError, formatApiErrorMessage } from '../../src/api/client';
 import SolidHeader from '../../src/components/SolidHeader';
 import Card from '../../src/components/Card';
@@ -54,27 +55,6 @@ import {
 
 const commentAuthor = (c) => c?.user ?? c?.author ?? null;
 const commentDate = (c) => c?.create_date ?? c?.created_at ?? c?.date ?? null;
-
-function attachmentUrl(a) {
-  return (
-    a?.file?.url ??
-    (typeof a?.file === 'string' ? a.file : null) ??
-    a?.url ??
-    a?.file_url ??
-    a?.download_url ??
-    a?.link ??
-    a?.href ??
-    null
-  );
-}
-
-function attachmentName(a) {
-  return a?.file?.name ?? a?.name ?? a?.file_name ?? a?.title ?? 'Файл';
-}
-
-function attachmentThumb(a) {
-  return a?.thumbnail?.url ?? null;
-}
 
 // `assistants`/`spectators`/`tags` may come back as full objects or bare ids
 // depending on the serializer; resolve ids against a lookup map either way.
