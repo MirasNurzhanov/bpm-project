@@ -241,7 +241,7 @@ export default function ApprovalDetailScreen() {
           </TouchableOpacity>
         }
         right={
-          isInitiator && statusId === APPROVAL_DRAFT ? (
+          isInitiator ? (
             <TouchableOpacity
               hitSlop={8}
               onPress={() => router.push({ pathname: '/new-approval', params: { id: process.id ?? process.pk } })}
