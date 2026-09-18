@@ -116,13 +116,22 @@ export default function ApprovalDetailScreen() {
   // (NOT initiator — that's the task-model naming, kept as a fallback here).
   const author = process.author ?? process.initiator;
   const initiatorName = userDisplayName(author) || '—';
-  const isInitiator =
-    (process.author?.id ?? process.author?.pk ?? process.author_id ?? process.initiator?.id ?? process.initiator_id) ===
-    user?.id;
+  const authorId = process.author?.id ?? process.author?.pk ?? process.author_id ?? process.initiator?.id ?? process.initiator_id;
+  // Loose/string comparison: ids have come back as numbers in some responses
+  // and strings in others elsewhere in this app — don't let that hide a match.
+  const isInitiator = authorId != null && user?.id != null && String(authorId) === String(user.id);
   const money = formatMoney(process.money_amount);
 
   if (__DEV__) {
     console.log('[approval] process keys ->', Object.keys(process).join(', '));
+    console.log(
+      '[approval] statusId =', statusId,
+      '| isInitiator =', isInitiator,
+      '| authorId =', authorId, typeof authorId,
+      '| userId =', user?.id, typeof user?.id,
+      '| raw approval_status =', JSON.stringify(process.approval_status ?? process.approval_status_id ?? process.status ?? process.status_id),
+      '| raw author =', JSON.stringify(process.author ?? process.author_id ?? process.initiator ?? process.initiator_id)
+    );
     console.log('[approval] stage history raw ->', JSON.stringify(history).slice(0, 3000));
   }
 
