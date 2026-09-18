@@ -381,7 +381,7 @@ export default function ApprovalDetailScreen() {
               loading={decisionPending === 'approve'}
               disabled={decisionPending != null}
               onPress={() => onDecide(true)}
-              style={styles.footerBtn}
+              style={styles.footerRowBtn}
             />
             <PrimaryButton
               label="Отклонить"
@@ -389,7 +389,7 @@ export default function ApprovalDetailScreen() {
               loading={decisionPending === 'reject'}
               disabled={decisionPending != null}
               onPress={() => onDecide(false)}
-              style={styles.footerBtn}
+              style={styles.footerRowBtn}
             />
           </View>
           {isInitiator ? (
@@ -447,7 +447,12 @@ const styles = StyleSheet.create({
     borderTopColor: colors.line,
   },
   footerRow: { flexDirection: 'row', gap: 8 },
-  footerBtn: { flex: 1 },
+  // Buttons stacked directly in the (column) footer need an explicit width —
+  // flex:1 collapses to zero height there since the footer's own height is
+  // intrinsic (nothing to distribute). Only use flex:1 for footerRow children,
+  // where the row's width is bounded by the screen.
+  footerBtn: { width: '100%' },
+  footerRowBtn: { flex: 1 },
   commentInput: {
     fontFamily: fontFamily.regular,
     fontSize: 14,
