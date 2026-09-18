@@ -112,9 +112,13 @@ export default function ApprovalDetailScreen() {
   const status = approvalStatusInfo(process);
   const code = process.slug ?? `#${process.id ?? process.pk}`;
   const typeName = process.doc_type?.name ?? process.type?.name ?? process.document_type?.name ?? '';
-  const initiatorName = userDisplayName(process.initiator) || '—';
+  // Confirmed field name from the create-form's instance dict: author/author_id
+  // (NOT initiator — that's the task-model naming, kept as a fallback here).
+  const author = process.author ?? process.initiator;
+  const initiatorName = userDisplayName(author) || '—';
   const isInitiator =
-    (process.initiator?.id ?? process.initiator?.pk ?? process.initiator_id) === user?.id;
+    (process.author?.id ?? process.author?.pk ?? process.author_id ?? process.initiator?.id ?? process.initiator_id) ===
+    user?.id;
   const money = formatMoney(process.money_amount);
 
   if (__DEV__) {
