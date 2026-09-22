@@ -79,16 +79,6 @@ export default function NewApprovalScreen() {
   const needsCurrency = Boolean(selectedTypeRaw?.payment_status);
   const needsSubject = Boolean(selectedTypeRaw?.subject_required);
 
-  if (__DEV__ && type) {
-    console.log(
-      '[new-approval] selected type id =', type.id, typeof type.id,
-      '| matched =', Boolean(selectedTypeRaw),
-      '| payment_status =', selectedTypeRaw?.payment_status,
-      '| subject_required =', selectedTypeRaw?.subject_required,
-      '| raw type ids =', (typesData ?? []).map((t) => [t.id ?? t.pk, typeof (t.id ?? t.pk)])
-    );
-  }
-
   const prefilled = useRef(false);
   useEffect(() => {
     if (!editProcess || prefilled.current) return;
@@ -264,16 +254,6 @@ export default function NewApprovalScreen() {
             <Ionicons name="chevron-forward" size={16} color={colors.chevron} />
           </TouchableOpacity>
 
-          {__DEV__ ? (
-            <Text style={styles.debugText}>
-              DEBUG: type={String(type?.id)} matched={String(Boolean(selectedTypeRaw))}{' '}
-              payment_status={String(selectedTypeRaw?.payment_status)}{' '}
-              subject_required={String(selectedTypeRaw?.subject_required)}{' '}
-              needsCurrency={String(needsCurrency)} needsSubject={String(needsSubject)}{' '}
-              typesLoaded={(typesData ?? []).length}
-            </Text>
-          ) : null}
-
           {needsCurrency ? (
             <TouchableOpacity
               style={[styles.pickerRow, styles.border]}
@@ -395,14 +375,6 @@ const styles = StyleSheet.create({
   pickerLabel: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.text, flex: 1 },
   pickerValue: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.muted, maxWidth: 150 },
   pickerValueError: { color: colors.danger },
-  debugText: {
-    fontFamily: fontFamily.regular,
-    fontSize: 11,
-    color: colors.danger,
-    backgroundColor: colors.danger100,
-    padding: 6,
-    borderRadius: 6,
-  },
   cardTitle: { fontFamily: fontFamily.semiBold, fontSize: 15, color: colors.text },
   dropzone: {
     borderWidth: 1,
