@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, RefreshControl, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useFetch } from '../../src/hooks/useFetch';
 import {
@@ -85,15 +86,20 @@ export default function TasksScreen() {
         title="Мои задачи"
         left={<View />}
         right={
-          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.8}>
-            <Avatar
-              name={userDisplayName(user)}
-              uri={user?.photo?.url}
-              size={38}
-              color={colors.primary}
-              background={colors.surface}
-            />
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity onPress={() => router.push('/new-task')} hitSlop={8}>
+              <Ionicons name="add" size={24} color={colors.surface} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.8}>
+              <Avatar
+                name={userDisplayName(user)}
+                uri={user?.photo?.url}
+                size={38}
+                color={colors.primary}
+                background={colors.surface}
+              />
+            </TouchableOpacity>
+          </>
         }
       >
         <SearchBar value={search} onChangeText={setSearch} placeholder="Поиск по задачам" />

@@ -1,6 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontFamily } from '../theme/theme';
 
@@ -22,7 +21,6 @@ const LABELS = {
 
 export default function CustomTabBar({ state, navigation }) {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
 
   return (
     <View style={[styles.wrap, { paddingBottom: insets.bottom || 12 }]}>
@@ -46,15 +44,6 @@ export default function CustomTabBar({ state, navigation }) {
           </TouchableOpacity>
         );
       })}
-
-      <TouchableOpacity
-        accessibilityRole="button"
-        activeOpacity={0.85}
-        style={styles.fab}
-        onPress={() => router.push('/new-task')}
-      >
-        <Ionicons name="add" size={26} color={colors.surface} />
-      </TouchableOpacity>
     </View>
   );
 }
@@ -75,25 +64,5 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: fontFamily.medium,
     fontSize: 10,
-  },
-  fab: {
-    position: 'absolute',
-    top: -30,
-    alignSelf: 'center',
-    left: '50%',
-    marginLeft: -26,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.success,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: colors.surface,
-    shadowColor: colors.success,
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
   },
 });
