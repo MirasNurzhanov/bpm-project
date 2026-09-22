@@ -159,7 +159,7 @@ export default function NewApprovalScreen() {
     if (!title.trim()) errors.title = 'Укажите название';
     if (!type) errors.type = 'Выберите тип процесса';
     if (needsCurrency && !currency) errors.currency = 'Выберите валюту';
-    if (needsSubject && !subject) errors.subject = 'Выберите предмет';
+    if (needsSubject && !subject) errors.subject = 'Выберите контрагента';
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
       return;
@@ -270,7 +270,7 @@ export default function NewApprovalScreen() {
               onPress={() => { setSubjectPickerOpen(true); clearFieldError('subject'); }}
             >
               <Ionicons name="business-outline" size={18} color={colors.muted} />
-              <Text style={styles.pickerLabel}>Предмет</Text>
+              <Text style={styles.pickerLabel}>Контрагент</Text>
               <Text style={[styles.pickerValue, fieldErrors.subject && styles.pickerValueError]} numberOfLines={1}>
                 {subject?.label ?? 'Не выбран'}
               </Text>
@@ -335,7 +335,7 @@ export default function NewApprovalScreen() {
 
       <PickerModal
         visible={subjectPickerOpen}
-        title="Выберите предмет"
+        title="Выберите контрагента"
         options={subjectOptions}
         selectedId={subject?.id}
         onSelect={(item) => { setSubject(item); setSubjectPickerOpen(false); }}
