@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   field: { gap: 6 },
   fieldLabel: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.muted },
   input: { fontFamily: fontFamily.regular, fontSize: 15, color: colors.text, paddingVertical: 4 },
-  multiline: { minHeight: 60, textAlignVertical: 'top' },
+  multiline: { minHeight: 40, textAlignVertical: 'top' },
   error: { fontFamily: fontFamily.regular, fontSize: 12, color: colors.danger },
   pickerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
   border: { borderTopWidth: 1, borderColor: colors.line },
