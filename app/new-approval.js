@@ -20,7 +20,7 @@ import {
   createApproval,
   updateApproval,
   getApproval,
-  getApprovalTypesSimple,
+  getApprovalTypes,
   getApprovalCreateForm,
 } from '../src/api/approvals';
 import { buildNewFiles } from '../src/api/attachments';
@@ -40,7 +40,7 @@ export default function NewApprovalScreen() {
   const { id: editId } = useLocalSearchParams();
   const isEdit = Boolean(editId);
 
-  const { data: typesData } = useFetch(getApprovalTypesSimple, []);
+  const { data: typesData } = useFetch(getApprovalTypes, []);
   const { data: createForm } = useFetch(getApprovalCreateForm, []);
   const { data: editProcess } = useFetch(
     () => (editId ? getApproval(editId) : Promise.resolve(null)),
@@ -71,9 +71,23 @@ export default function NewApprovalScreen() {
 
   // The selected type tells us whether currency/subject are actually needed
   // for this kind of process (payment_status / subject_required flags).
-  const selectedTypeRaw = (typesData ?? []).find((t) => (t.id ?? t.pk) === type?.id);
+  // String-compare ids: they've come back as different types (number vs
+  // string) across endpoints elsewhere in this app.
+  const selectedTypeRaw = (typesData ?? []).find(
+    (t) => type?.id != null && String(t.id ?? t.pk) === String(type.id)
+  );
   const needsCurrency = Boolean(selectedTypeRaw?.payment_status);
   const needsSubject = Boolean(selectedTypeRaw?.subject_required);
+
+  if (__DEV__ && type) {
+    console.log(
+      '[new-approval] selected type id =', type.id, typeof type.id,
+      '| matched =', Boolean(selectedTypeRaw),
+      '| payment_status =', selectedTypeRaw?.payment_status,
+      '| subject_required =', selectedTypeRaw?.subject_required,
+      '| raw type ids =', (typesData ?? []).map((t) => [t.id ?? t.pk, typeof (t.id ?? t.pk)])
+    );
+  }
 
   const prefilled = useRef(false);
   useEffect(() => {
