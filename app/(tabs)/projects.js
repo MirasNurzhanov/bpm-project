@@ -60,7 +60,13 @@ export default function ProjectsScreen() {
             <TouchableOpacity onPress={() => router.push('/new-project')} hitSlop={8}>
               <Ionicons name="add" size={24} color={colors.surface} />
             </TouchableOpacity>
-            <Avatar name={userDisplayName(user)} uri={user?.photo?.url} size={34} color={colors.surface} />
+            <Avatar
+              name={userDisplayName(user)}
+              uri={user?.photo?.url}
+              size={38}
+              color={colors.primary}
+              background={colors.surface}
+            />
           </>
         }
       >
